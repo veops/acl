@@ -1,0 +1,88 @@
+version: '3.5'
+
+services:
+  acl-db:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/cmdb-db:3.0
+    container_name: acl-db
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: '123456'
+      MYSQL_DATABASE: 'acl'
+      MYSQL_USER: 'acl'
+      MYSQL_PASSWORD: '123456'
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docs/mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
+      - ./docs/acl.sql:/docker-entrypoint-initdb.d/acl.sql
+    networks:
+      new:
+        aliases:
+          - mysql
+    ports:
+      - '13306:3306'
+
+  acl-cache:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/cmdb-cache:3.0
+    container_name: acl-cache
+    networks:
+      new:
+        aliases:
+          - redis
+
+  acl-api:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:1.0
+#    build:
+#      context: .
+#      target: acl-api
+    container_name: acl-api
+    environment:
+      TZ: Asia/Shanghai
+      WAIT_HOSTS: acl-db:3306, acl-cache:6379
+    command:
+      - /bin/sh
+      - -c
+      - |
+        sleep 2
+        gunicorn --workers=3 autoapp:app -b 0.0.0.0:5000 -D
+        flask db-setup
+        flask init-acl
+
+        celery worker -A celery_worker.celery -E -Q acl_async --concurrency=2
+    depends_on:
+      - acl-db
+      - acl-cache
+    networks:
+      new:
+        aliases:
+          - acl-api
+
+  acl-ui:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-ui:1.0
+#    build:
+#      context: .
+#      target: acl-ui
+    container_name: acl-ui
+    depends_on:
+      - acl-api
+    environment:
+      TZ: Asia/Shanghai
+      ACL_API_HOST: acl-api:5000
+      NGINX_PORT: 80
+    volumes:
+      - ./docs/nginx.acl.conf.example:/etc/nginx/conf.d/nginx.acl.conf.example
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst '$$ACL_API_HOST  $$NGINX_PORT' < /etc/nginx/conf.d/nginx.acl.conf.example > /etc/nginx/conf.d/acl.conf
+        nginx -g  'daemon off;'
+    networks:
+      - new
+    ports:
+      - "8000:80"
+
+volumes:
+  db-data:
+
+networks:
+  new:
