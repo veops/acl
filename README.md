@@ -30,7 +30,16 @@
 
 ## 安装
 
-### [Docker 一键快速构建](docs/docker.md)
+### Docker一键快速构建
+- 进入主目录（先安装 docker 环境）
+
+```
+docker-compose up -d
+```
+
+- 浏览器打开: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- username: admin 
+- password: 123456
 
 ### [本地搭建](docs/local.md)
 
