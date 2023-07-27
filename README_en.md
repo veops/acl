@@ -18,13 +18,28 @@
 - Audit log for operations.
 - Provides REST API for easy integration.
 
+### Document
+
+- <a href="acl-api/example.py" target="_blank">example</a> 
+
+
 ### More Features
 
 > You are also welcome to visit [VEOps official website](https://veops.cn) to discover more free operations and maintenance systems.
 
 ## Installation
 
-### [One-Click Docker Quick Build](docs/docker.md)
+### One-Click Docker Quick Build
+
+- Prepare: install docker and docker-compose
+- In directory acl
+  ```
+  docker-compose up -d
+  ```
+- View: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- username: admin
+- password: 123456
+
 
 ### [Local Setup](docs/local.md)
 
