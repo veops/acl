@@ -3,7 +3,6 @@
 import traceback
 from datetime import datetime
 
-import pandas as pd
 from flask import abort
 from flask_login import current_user
 from sqlalchemy import or_, literal_column, func, not_, and_
@@ -17,8 +16,19 @@ from api.extensions import db
 from api.lib.common_setting.acl import ACLManager
 from api.lib.common_setting.const import COMMON_SETTING_QUEUE, OperatorType
 from api.lib.common_setting.resp_format import ErrFormat
-from api.lib.common_setting.utils import get_df_from_read_sql
 from api.models.common_setting import Employee, Department
+
+acl_user_columns = [
+    'email',
+    'mobile',
+    'nickname',
+    'username',
+    'password',
+    'block',
+    'avatar',
+]
+employee_pop_columns = ['password']
+can_not_edit_columns = ['email']
 
 
 def edit_acl_user(uid, **kwargs):
@@ -70,9 +80,6 @@ class EmployeeCRUD(object):
 
     @staticmethod
     def get_employee_by_uid_with_create(_uid):
-        """
-        根据 uid 获取员工信息，不存在则创建
-        """
         try:
             return EmployeeCRUD.get_employee_by_uid(_uid).to_dict()
         except Exception as e:
@@ -102,7 +109,6 @@ class EmployeeCRUD(object):
                 acl_uid=user_info['uid'],
             )
             return existed.to_dict()
-        # 创建员工
         if not user_info.get('nickname', None):
             user_info['nickname'] = user_info['name']
 
@@ -145,9 +151,6 @@ class EmployeeCRUD(object):
 
             if len(e_list) > 0:
                 from api.tasks.common_setting import edit_employee_department_in_acl
-                # fixme: comment next line
-                # edit_employee_department_in_acl(e_list, new_department_id, current_user.uid)
-
                 edit_employee_department_in_acl.apply_async(
                     args=(e_list, new_department_id, current_user.uid),
                     queue=COMMON_SETTING_QUEUE
@@ -210,173 +213,6 @@ class EmployeeCRUD(object):
         ).count()
 
     @staticmethod
-    def import_employee(employee_list):
-        return CreateEmployee().batch_create(employee_list)
-
-    @staticmethod
-    def get_export_employee_df(block_status):
-        criterion = [
-            Employee.deleted == 0
-        ]
-        if block_status >= 0:
-            criterion.append(
-                Employee.block == block_status
-            )
-
-        query = Employee.query.with_entities(
-            Employee.employee_id,
-            Employee.nickname,
-            Employee.email,
-            Employee.sex,
-            Employee.mobile,
-            Employee.position_name,
-            Employee.last_login,
-            Employee.department_id,
-            Employee.direct_supervisor_id,
-        ).filter(*criterion)
-        df = get_df_from_read_sql(query)
-        if df.empty:
-            return df
-
-        query = Department.query.filter(
-            *criterion
-        )
-        department_df = get_df_from_read_sql(query)
-
-        def find_name(row):
-            department_id = row['department_id']
-            _df = department_df[department_df['department_id']
-                                == department_id]
-            row['department_name'] = '' if _df.empty else _df.iloc[0]['department_name']
-
-            direct_supervisor_id = row['direct_supervisor_id']
-            _df = df[df['employee_id'] == direct_supervisor_id]
-            row['nickname_direct_supervisor'] = '' if _df.empty else _df.iloc[0]['nickname']
-
-            if isinstance(row['last_login'], pd.Timestamp):
-                try:
-                    row['last_login'] = str(row['last_login'])
-                except:
-                    row['last_login'] = ''
-            else:
-                row['last_login'] = ''
-
-            return row
-
-        df = df.apply(find_name, axis=1)
-        df.drop(['department_id', 'direct_supervisor_id',
-                 'employee_id'], axis=1, inplace=True)
-        return df
-
-    @staticmethod
-    def batch_employee(column_name, column_value, employee_id_list):
-        if not column_value:
-            abort(400, ErrFormat.value_is_required)
-        if column_name in ['password', 'block']:
-            return EmployeeCRUD.batch_edit_password_or_block_column(column_name, employee_id_list, column_value, True)
-
-        elif column_name in ['department_id']:
-            return EmployeeCRUD.batch_edit_employee_department(employee_id_list, column_value)
-
-        elif column_name in [
-            'direct_supervisor_id', 'position_name'
-        ]:
-            return EmployeeCRUD.batch_edit_column(column_name, employee_id_list, column_value, False)
-
-        else:
-            abort(400, ErrFormat.column_name_not_support)
-
-    @staticmethod
-    def batch_edit_employee_department(employee_id_list, column_value):
-        err_list = []
-        employee_list = []
-        for _id in employee_id_list:
-            try:
-                existed = EmployeeCRUD.get_employee_by_id(_id)
-                employee = dict(
-                    e_acl_rid=existed.acl_rid,
-                    department_id=existed.department_id
-                )
-                employee_list.append(employee)
-                existed.update(department_id=column_value)
-
-            except Exception as e:
-                err_list.append({
-                    'employee_id': _id,
-                    'err': str(e),
-                })
-        from api.tasks.common_setting import edit_employee_department_in_acl
-        edit_employee_department_in_acl.apply_async(
-            args=(employee_list, column_value, current_user.uid),
-            queue=COMMON_SETTING_QUEUE
-        )
-        return err_list
-
-    @staticmethod
-    def batch_edit_password_or_block_column(column_name, employee_id_list, column_value, is_acl=False):
-        if column_name == 'block':
-            err_list = []
-            success_list = []
-            for _id in employee_id_list:
-                try:
-                    employee = EmployeeCRUD.edit_employee_block_column(
-                        _id, is_acl, **{column_name: column_value})
-                    success_list.append(employee)
-                except Exception as e:
-                    err_list.append({
-                        'employee_id': _id,
-                        'err': str(e),
-                    })
-            return err_list
-        else:
-            return EmployeeCRUD.batch_edit_column(column_name, employee_id_list, column_value, is_acl)
-
-    @staticmethod
-    def batch_edit_column(column_name, employee_id_list, column_value, is_acl=False):
-        err_list = []
-        for _id in employee_id_list:
-            try:
-                EmployeeCRUD.edit_employee_single_column(
-                    _id, is_acl, **{column_name: column_value})
-            except Exception as e:
-                err_list.append({
-                    'employee_id': _id,
-                    'err': str(e),
-                })
-
-        return err_list
-
-    @staticmethod
-    def edit_employee_single_column(_id, is_acl=False, **kwargs):
-        existed = EmployeeCRUD.get_employee_by_id(_id)
-
-        if is_acl:
-            return edit_acl_user(existed.acl_uid, **kwargs)
-
-        try:
-            for column in employee_pop_columns:
-                if kwargs.get(column):
-                    kwargs.pop(column)
-
-            return existed.update(**kwargs)
-        except Exception as e:
-            return abort(400, str(e))
-
-    @staticmethod
-    def edit_employee_block_column(_id, is_acl=False, **kwargs):
-        existed = EmployeeCRUD.get_employee_by_id(_id)
-        value = get_block_value(kwargs.get('block'))
-        if value is True:
-            # 判断该用户是否为 部门负责人，或者员工的直接上级
-            check_department_director_id_or_direct_supervisor_id(_id)
-
-        if is_acl:
-            kwargs['block'] = value
-            edit_acl_user(existed.acl_uid, **kwargs)
-        data = existed.to_dict()
-        return data
-
-    @staticmethod
     def check_email_unique(email, _id=0):
         criterion = [
             Employee.email == email,
@@ -395,7 +231,7 @@ class EmployeeCRUD(object):
             raise Exception(err)
 
     @staticmethod
-    def get_employee_list_by_body(department_id, block_status, search='', order='', conditions=[], page=1,
+    def get_employee_list_by_body(department_id, block_status, search='', order='', conditions=None, page=1,
                                   page_size=10):
         criterion = [
             Employee.deleted == 0
@@ -461,7 +297,7 @@ class EmployeeCRUD(object):
     @staticmethod
     def get_expr_by_condition(column, operator, value, relation):
         """
-        根据conditions返回expr: (and_list, or_list)
+        get expr: (and_list, or_list)
         """
         attr = EmployeeCRUD.get_attr_by_column(column)
         # 根据operator生成条件表达式
@@ -481,7 +317,7 @@ class EmployeeCRUD(object):
             if value:
                 abort(400, ErrFormat.query_column_none_keep_value_empty.format(column))
             expr = [attr.is_(None)]
-            if column not in ["entry_date", "leave_date", "dfc_entry_date", "last_login"]:
+            if column not in ["last_login"]:
                 expr += [attr == '']
                 expr = [or_(*expr)]
         elif operator == OperatorType.IS_NOT_EMPTY:
@@ -495,7 +331,6 @@ class EmployeeCRUD(object):
         else:
             abort(400, ErrFormat.not_support_operator.format(operator))
 
-        # 根据relation生成复合条件
         if relation == "&":
             return expr, []
         elif relation == "|":
@@ -505,7 +340,6 @@ class EmployeeCRUD(object):
 
     @staticmethod
     def check_condition(column, operator, value, relation):
-        # 对于condition中column为空的，报错
         if column is None or operator is None or relation is None:
             return abort(400, ErrFormat.conditions_field_missing)
 
@@ -654,19 +488,6 @@ def get_user_map(key='uid', acl=None):
     return data
 
 
-acl_user_columns = [
-    'email',
-    'mobile',
-    'nickname',
-    'username',
-    'password',
-    'block',
-    'avatar',
-]
-employee_pop_columns = ['password']
-can_not_edit_columns = ['email']
-
-
 def format_params(params):
     for k in ['_key', '_secret']:
         params.pop(k, None)
@@ -676,19 +497,22 @@ def format_params(params):
 class CreateEmployee(object):
     def __init__(self):
         self.acl = ACLManager()
-        self.useremail_map = {}
+        self.all_acl_users = self.acl.get_all_users()
 
-    def check_acl_user(self, email):
-        user_info = self.useremail_map.get(email, None)
-        if user_info:
-            return user_info
-        return None
+    def check_acl_user(self, user_data):
+        target_email = list(filter(lambda x: x['email'] == user_data['email'], self.all_acl_users))
+        if target_email:
+            return target_email[0]
+
+        target_username = list(filter(lambda x: x['username'] == user_data['username'], self.all_acl_users))
+        if target_username:
+            return target_username[0]
 
     def add_acl_user(self, **kwargs):
         user_data = {column: kwargs.get(
             column, '') for column in acl_user_columns if kwargs.get(column, '')}
         try:
-            existed = self.check_acl_user(user_data['email'])
+            existed = self.check_acl_user(user_data)
             if not existed:
                 return self.acl.create_user(user_data)
             return existed
@@ -697,8 +521,6 @@ class CreateEmployee(object):
 
     def create_single(self, **kwargs):
         EmployeeCRUD.check_email_unique(kwargs['email'])
-        self.useremail_map = self.useremail_map if self.useremail_map else get_user_map(
-            'email', self.acl)
         user = self.add_acl_user(**kwargs)
         kwargs['acl_uid'] = user['uid']
         kwargs['last_login'] = user['last_login']
@@ -711,8 +533,6 @@ class CreateEmployee(object):
         )
 
     def create_single_with_import(self, **kwargs):
-        self.useremail_map = self.useremail_map if self.useremail_map else get_user_map(
-            'email', self.acl)
         user = self.add_acl_user(**kwargs)
         kwargs['acl_uid'] = user['uid']
         kwargs['last_login'] = user['last_login']
@@ -755,9 +575,6 @@ class CreateEmployee(object):
         return end_d_id
 
     def format_department_id(self, employee):
-        """
-        部门名称转化为ID，不存在则创建
-        """
         department_name_map = {}
         try:
             department_name = employee.get('department_name', '')
@@ -774,16 +591,13 @@ class CreateEmployee(object):
 
     def batch_create(self, employee_list):
         err_list = []
-        self.useremail_map = get_user_map('email', self.acl)
 
         for employee in employee_list:
             try:
-                # 获取username
                 username = employee.get('username', None)
                 if username is None:
                     employee['username'] = employee['email']
 
-                # 校验通过后获取department_id
                 employee = self.format_department_id(employee)
                 err = employee.get('err', None)
                 if err:
@@ -795,7 +609,7 @@ class CreateEmployee(object):
                     raise Exception(
                         ','.join(['{}: {}'.format(filed, ','.join(msg)) for filed, msg in form.errors.items()]))
 
-                data = self.create_single_with_import(**form.data)
+                self.create_single_with_import(**form.data)
             except Exception as e:
                 err_list.append({
                     'email': employee.get('email', ''),
@@ -809,12 +623,12 @@ class CreateEmployee(object):
 
 class EmployeeAddForm(Form):
     username = StringField(validators=[
-        validators.DataRequired(message="username不能为空"),
+        validators.DataRequired(message=ErrFormat.username_is_required),
         validators.Length(max=255),
     ])
     email = StringField(validators=[
-        validators.DataRequired(message="邮箱不能为空"),
-        validators.Email(message="邮箱格式不正确"),
+        validators.DataRequired(message=ErrFormat.email_is_required),
+        validators.Email(message=ErrFormat.email_format_error),
         validators.Length(max=255),
     ])
     password = StringField(validators=[
@@ -823,7 +637,7 @@ class EmployeeAddForm(Form):
     position_name = StringField(validators=[])
 
     nickname = StringField(validators=[
-        validators.DataRequired(message="用户名不能为空"),
+        validators.DataRequired(message=ErrFormat.nickname_is_required),
         validators.Length(max=255),
     ])
     sex = StringField(validators=[])
@@ -834,7 +648,7 @@ class EmployeeAddForm(Form):
 
 class EmployeeUpdateByUidForm(Form):
     nickname = StringField(validators=[
-        validators.DataRequired(message="用户名不能为空"),
+        validators.DataRequired(message=ErrFormat.nickname_is_required),
         validators.Length(max=255),
     ])
     avatar = StringField(validators=[])

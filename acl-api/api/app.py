@@ -12,7 +12,7 @@ from flask import Flask
 from flask import make_response, jsonify
 from flask.blueprints import Blueprint
 from flask.cli import click
-from flask.json import JSONEncoder
+from flask.json.provider import DefaultJSONProvider
 
 import api.views.entry
 from api.extensions import (
@@ -74,7 +74,7 @@ class ReverseProxy(object):
         return self.app(environ, start_response)
 
 
-class MyJSONEncoder(JSONEncoder):
+class MyJSONEncoder(DefaultJSONProvider):
     def default(self, o):
         if isinstance(o, (decimal.Decimal, datetime.date, datetime.time)):
             return str(o)
@@ -102,7 +102,7 @@ def create_app(config_object="settings"):
     app = Flask(__name__.split(".")[0])
 
     app.config.from_object(config_object)
-    app.json_encoder = MyJSONEncoder
+    app.json = MyJSONEncoder(app)
     configure_logger(app)
     register_extensions(app)
     register_blueprints(app)
@@ -136,6 +136,8 @@ def register_extensions(app):
     login_manager.init_app(app)
     migrate.init_app(app, db)
     rd.init_app(app)
+
+    app.config.update(app.config.get("CELERY"))
     celery.conf.update(app.config)
 
 

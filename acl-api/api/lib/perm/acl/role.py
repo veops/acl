@@ -6,6 +6,7 @@ import time
 import six
 from flask import abort
 from flask import current_app
+from sqlalchemy import or_
 
 from api.extensions import db
 from api.lib.perm.acl.app import AppCRUD
@@ -212,17 +213,15 @@ class RoleCRUD(object):
 
     @staticmethod
     def search(q, app_id, page=1, page_size=None, user_role=True, is_all=False, user_only=False):
-        query = db.session.query(Role).filter(Role.deleted.is_(False))
-        query1 = query.filter(Role.app_id == app_id).filter(Role.uid.is_(None))
-        query2 = query.filter(Role.app_id.is_(None)).filter(Role.uid.is_(None))
-        query = query1.union(query2)
 
-        if user_role:
-            query1 = db.session.query(Role).filter(Role.deleted.is_(False)).filter(Role.uid.isnot(None))
-            query = query.union(query1)
-
-        if user_only:
+        if user_only:  # only user role
             query = db.session.query(Role).filter(Role.deleted.is_(False)).filter(Role.uid.isnot(None))
+
+        else:
+            query = db.session.query(Role).filter(Role.deleted.is_(False)).filter(
+                or_(Role.app_id == app_id, Role.app_id.is_(None)))
+            if not user_role:  # only virtual role
+                query = query.filter(Role.uid.is_(None))
 
         if not is_all:
             role_ids = list(HasResourceRoleCache.get(app_id).keys())
@@ -286,10 +285,12 @@ class RoleCRUD(object):
         return role
 
     @classmethod
-    def delete_role(cls, rid):
+    def delete_role(cls, rid, force=False):
         from api.lib.perm.acl.acl import is_admin
 
         role = Role.get_by_id(rid) or abort(404, ErrFormat.role_not_found.format("rid={}".format(rid)))
+
+        not force and role.uid and abort(400, ErrFormat.user_role_delete_invalid)
 
         if not role.app_id and not is_admin():
             return abort(403, ErrFormat.admin_required)
@@ -302,18 +303,20 @@ class RoleCRUD(object):
 
         for i in RoleRelation.get_by(parent_id=rid, to_dict=False):
             child_ids.append(i.child_id)
-            i.soft_delete()
+            i.soft_delete(commit=False)
 
         for i in RoleRelation.get_by(child_id=rid, to_dict=False):
             parent_ids.append(i.parent_id)
-            i.soft_delete()
+            i.soft_delete(commit=False)
 
         role_permissions = []
         for i in RolePermission.get_by(rid=rid, to_dict=False):
             role_permissions.append(i.to_dict())
-            i.soft_delete()
+            i.soft_delete(commit=False)
 
-        role.soft_delete()
+        role.soft_delete(commit=False)
+
+        db.session.commit()
 
         role_rebuild.apply_async(args=(recursive_child_ids, role.app_id), queue=ACL_QUEUE)
 

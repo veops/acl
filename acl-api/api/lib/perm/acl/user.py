@@ -6,7 +6,7 @@ import string
 import uuid
 
 from flask import abort
-from flask import g
+from flask_login import current_user
 
 from api.extensions import db
 from api.lib.perm.acl.audit import AuditCRUD, AuditOperateType, AuditScope
@@ -39,8 +39,11 @@ class UserCRUD(object):
 
     @classmethod
     def add(cls, **kwargs):
-        existed = User.get_by(username=kwargs['username'], email=kwargs['email'])
+        existed = User.get_by(username=kwargs['username'])
         existed and abort(400, ErrFormat.user_exists.format(kwargs['username']))
+
+        existed = User.get_by(username=kwargs['email'])
+        existed and abort(400, ErrFormat.user_exists.format(kwargs['email']))
 
         kwargs['nickname'] = kwargs.get('nickname') or kwargs['username']
         kwargs['block'] = 0
@@ -90,9 +93,9 @@ class UserCRUD(object):
     @classmethod
     def reset_key_secret(cls):
         key, secret = cls.gen_key_secret()
-        g.user.update(key=key, secret=secret)
+        current_user.update(key=key, secret=secret)
 
-        UserCache.clean(g.user)
+        UserCache.clean(current_user)
 
         return key, secret
 
@@ -103,9 +106,13 @@ class UserCRUD(object):
 
         origin = user.to_dict()
 
-        user.soft_delete()
+        user.delete()
 
         UserCache.clean(user)
+
+        role = RoleCRUD.get_by_name(user.username, app_id=None)
+        if role:
+            RoleCRUD.delete_role(role[0]['id'], force=True)
 
         AuditCRUD.add_role_log(None, AuditOperateType.delete,
                                AuditScope.user, user.uid, origin, {}, {}, {})

@@ -7,7 +7,6 @@ from functools import wraps
 import jwt
 from flask import abort
 from flask import current_app
-from flask import g
 from flask import request
 from flask import session
 from flask_login import login_user
@@ -64,12 +63,10 @@ def _auth_with_key():
 
 
 def _auth_with_session():
-    if isinstance(getattr(g, 'user', None), User):
-        login_user(g.user)
-        return True
     if "acl" in session and "userName" in (session["acl"] or {}):
         login_user(UserCache.get(session["acl"]["userName"]))
         return True
+
     return False
 
 
@@ -108,7 +105,7 @@ def _auth_with_ip_white_list():
 
 
 def _auth_with_app_token():
-    if _auth_with_session():
+    if _auth_with_session() or _auth_with_token():
         if not is_app_admin(request.values.get('app_id')) and request.method != "GET":
             return False
         elif is_app_admin(request.values.get('app_id')):
@@ -157,7 +154,7 @@ def _auth_with_acl_token():
 
 
 def auth_required(func):
-    if request.json is not None:
+    if request.get_json(silent=True) is not None:
         setattr(request, 'values', request.json)
     else:
         setattr(request, 'values', request.values.to_dict())

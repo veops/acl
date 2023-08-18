@@ -7,41 +7,26 @@ from wtforms import IntegerField
 from wtforms import StringField
 from wtforms import validators
 
+from api.extensions import db
 from api.lib.common_setting.resp_format import ErrFormat
-from api.lib.common_setting.utils import get_df_from_read_sql
 from api.lib.perm.acl.role import RoleCRUD
 from api.models.common_setting import Department, Employee
 
 sub_departments_column_name = 'sub_departments'
 
 
-def drop_ts_column(df):
-    columns = list(df.columns)
-    remove_columns = []
-    for column in ['created_at', 'updated_at', 'deleted_at', 'last_login']:
-        targets = list(filter(lambda c: c.startswith(column), columns))
-        if targets:
-            remove_columns.extend(targets)
-
-    remove_columns = list(set(remove_columns))
-
-    return df.drop(remove_columns, axis=1) if len(remove_columns) > 0 else df
-
-
-def get_department_df():
+def get_all_department_list(to_dict=True):
     criterion = [
         Department.deleted == 0,
     ]
     query = Department.query.filter(
         *criterion
-    )
-    df = get_df_from_read_sql(query)
-    if df.empty:
-        return
-    return drop_ts_column(df)
+    ).order_by(Department.department_id.asc())
+    results = query.all()
+    return [r.to_dict() for r in results] if to_dict else results
 
 
-def get_all_employee_df(block=0):
+def get_all_employee_list(block=0, to_dict=True):
     criterion = [
         Employee.deleted == 0,
     ]
@@ -50,112 +35,106 @@ def get_all_employee_df(block=0):
             Employee.block == block
         )
 
-    entities = [getattr(Employee, c) for c in Employee.get_columns(
-    ).keys() if c not in ['deleted', 'deleted_at']]
-    query = Employee.query.with_entities(
-        *entities
-    ).filter(
-        *criterion
-    )
-    df = get_df_from_read_sql(query)
-    if df.empty:
-        return df
-    return drop_ts_column(df)
+    results = db.session.query(Employee).filter(*criterion).all()
+
+    DepartmentTreeEmployeeColumns = [
+        'acl_rid',
+        'employee_id',
+        'username',
+        'nickname',
+        'email',
+        'mobile',
+        'direct_supervisor_id',
+        'block',
+        'department_id',
+    ]
+
+    def format_columns(e):
+        return {column: getattr(e, column) for column in DepartmentTreeEmployeeColumns}
+
+    return [format_columns(r) for r in results] if to_dict else results
 
 
 class DepartmentTree(object):
     def __init__(self, append_employee=False, block=-1):
         self.append_employee = append_employee
         self.block = block
-        self.d_df = get_department_df()
-        self.employee_df = get_all_employee_df(
+        self.all_department_list = get_all_department_list()
+        self.all_employee_list = get_all_employee_list(
             block) if append_employee else None
 
     def prepare(self):
         pass
 
     def get_employees_by_d_id(self, d_id):
-        _df = self.employee_df[
-            self.employee_df['department_id'].eq(d_id)
-        ].sort_values(by=['direct_supervisor_id'], ascending=True)
-        if _df.empty:
+        block = self.block
+
+        def filter_department_id(e):
+            if self.block != -1:
+                return e['department_id'] == d_id and e['block'] == block
+            return e.department_id == d_id
+
+        results = list(filter(lambda e: filter_department_id(e), self.all_employee_list))
+
+        return results
+
+    def get_department_by_parent_id(self, parent_id):
+        results = list(filter(lambda d: d['department_parent_id'] == parent_id, self.all_department_list))
+        if not results:
             return []
-
-        if self.block != -1:
-            _df = _df[
-                _df['block'].eq(self.block)
-            ]
-
-        return _df.to_dict('records')
+        return results
 
     def get_tree_departments(self):
         # 一级部门
-        top_df = self.d_df[self.d_df['department_parent_id'].eq(-1)]
-        if top_df.empty:
+        top_departments = self.get_department_by_parent_id(-1)
+        if len(top_departments) == 0:
             return []
 
         d_list = []
 
-        for index in top_df.index:
-            top_d = top_df.loc[index].to_dict()
-
+        for top_d in top_departments:
             department_id = top_d['department_id']
-
-            # 检查 department_id 是否作为其他部门的 parent
-            sub_df = self.d_df[
-                self.d_df['department_parent_id'].eq(department_id)
-            ].sort_values(by=['sort_value'], ascending=True)
-
+            sub_deps = self.get_department_by_parent_id(department_id)
             employees = []
-
             if self.append_employee:
-                # 要包含员工
                 employees = self.get_employees_by_d_id(department_id)
 
             top_d['employees'] = employees
-
-            if sub_df.empty:
+            if len(sub_deps) == 0:
                 top_d[sub_departments_column_name] = []
                 d_list.append(top_d)
                 continue
 
-            self.parse_sub_department(sub_df, top_d)
+            self.parse_sub_department(sub_deps, top_d)
             d_list.append(top_d)
 
         return d_list
 
     def get_all_departments(self, is_tree=1):
-        if self.d_df.empty:
+        if len(self.all_department_list) == 0:
             return []
 
         if is_tree != 1:
-            return self.d_df.to_dict('records')
+            return self.all_department_list
 
         return self.get_tree_departments()
 
-    def parse_sub_department(self, df, top_d):
+    def parse_sub_department(self, deps, top_d):
         sub_departments = []
-        for s_index in df.index:
-            d = df.loc[s_index].to_dict()
-            sub_df = self.d_df[
-                self.d_df['department_parent_id'].eq(
-                    df.at[s_index, 'department_id'])
-            ].sort_values(by=['sort_value'], ascending=True)
+        for d in deps:
+            sub_deps = self.get_department_by_parent_id(d['department_id'])
             employees = []
-
             if self.append_employee:
-                # 要包含员工
-                employees = self.get_employees_by_d_id(
-                    df.at[s_index, 'department_id'])
+                employees = self.get_employees_by_d_id(d['department_id'])
 
             d['employees'] = employees
 
-            if sub_df.empty:
+            if len(sub_deps) == 0:
                 d[sub_departments_column_name] = []
                 sub_departments.append(d)
                 continue
 
-            self.parse_sub_department(sub_df, d)
+            self.parse_sub_department(sub_deps, d)
             sub_departments.append(d)
 
         top_d[sub_departments_column_name] = sub_departments
@@ -202,7 +181,6 @@ class DepartmentCRUD(object):
     def check_department_parent_id_allow(d_id, department_parent_id):
         if department_parent_id == 0:
             return
-        # 检查 department_parent_id 是否在许可范围内
         allow_p_d_id_list = DepartmentCRUD.get_allow_parent_d_id_by(d_id)
         target = list(
             filter(lambda d: d['department_id'] == department_parent_id, allow_p_d_id_list))
@@ -281,9 +259,6 @@ class DepartmentCRUD(object):
 
     @staticmethod
     def get_allow_parent_d_id_by(department_id):
-        """
-        获取可以成为 department_id 的 department_parent_id 的 list
-        """
         tree_list = DepartmentCRUD.get_department_tree_list()
 
         allow_d_id_list = []
@@ -321,58 +296,57 @@ class DepartmentCRUD(object):
 
     @staticmethod
     def get_department_tree_list():
-        df = get_department_df()
-        if df.empty:
+        all_deps = get_all_department_list()
+        if len(all_deps) == 0:
             return []
 
-        # 一级部门
-        top_df = df[df['department_parent_id'].eq(-1)]
-        if top_df.empty:
+        top_deps = list(filter(lambda d: d['department_parent_id'] == -1, all_deps))
+        if len(top_deps) == 0:
             return []
 
         tree_list = []
 
-        for index in top_df.index:
+        for top_d in top_deps:
             tree = Tree()
-            identifier_root = top_df.at[index, 'department_id']
+            identifier_root = top_d['department_id']
             tree.create_node(
-                top_df.at[index, 'department_name'],
+                top_d['department_name'],
                 identifier_root
             )
-
-            # 检查 department_id 是否作为其他部门的 parent
-            sub_df = df[
-                df['department_parent_id'].eq(identifier_root)
-            ]
-            if sub_df.empty:
+            sub_ds = list(filter(lambda d: d['department_parent_id'] == identifier_root, all_deps))
+            if len(sub_ds) == 0:
                 tree_list.append(tree)
                 continue
 
             DepartmentCRUD.parse_sub_department_node(
-                sub_df, df, tree, identifier_root)
+                sub_ds, all_deps, tree, identifier_root)
 
             tree_list.append(tree)
 
         return tree_list
 
     @staticmethod
-    def parse_sub_department_node(df, all_df, tree, parent_id):
-        for s_index in df.index:
+    def parse_sub_department_node(sub_ds, all_ds, tree, parent_id):
+        for d in sub_ds:
             tree.create_node(
-                df.at[s_index, 'department_name'],
-                df.at[s_index, 'department_id'],
+                d['department_name'],
+                d['department_id'],
                 parent=parent_id
             )
 
-            sub_df = all_df[
-                all_df['department_parent_id'].eq(
-                    df.at[s_index, 'department_id'])
-            ]
-            if sub_df.empty:
+            next_sub_ds = list(filter(lambda item_d: item_d['department_parent_id'] == d['department_id'], all_ds))
+            if len(next_sub_ds) == 0:
                 continue
 
             DepartmentCRUD.parse_sub_department_node(
-                sub_df, all_df, tree, df.at[s_index, 'department_id'])
+                next_sub_ds, all_ds, tree, d['department_id'])
+
+    @staticmethod
+    def get_department_by_query(query, to_dict=True):
+        results = query.all()
+        if not results:
+            return []
+        return results if not to_dict else [r.to_dict() for r in results]
 
     @staticmethod
     def get_departments_and_ids(department_parent_id, block):
@@ -380,44 +354,30 @@ class DepartmentCRUD(object):
             Department.department_parent_id == department_parent_id,
             Department.deleted == 0,
         ).order_by(Department.sort_value.asc())
-        df = get_df_from_read_sql(query)
-        if df.empty:
+        all_departments = DepartmentCRUD.get_department_by_query(query)
+        if len(all_departments) == 0:
             return [], []
 
         tree_list = DepartmentCRUD.get_department_tree_list()
-        employee_df = get_all_employee_df(block)
+        all_employee_list = get_all_employee_list(block)
 
-        department_id_list = list(df['department_id'].values)
+        department_id_list = [d['department_id'] for d in all_departments]
         query = Department.query.filter(
             Department.department_parent_id.in_(department_id_list),
             Department.deleted == 0,
         ).order_by(Department.sort_value.asc()).group_by(Department.department_id)
-        sub_df = get_df_from_read_sql(query)
-        if sub_df.empty:
-            df['has_sub'] = 0
+        sub_deps = DepartmentCRUD.get_department_by_query(query)
 
-            def handle_row_employee_count(row):
-                return len(employee_df[employee_df['department_id'] == row['department_id']])
+        sub_map = {d['department_parent_id']: 1 for d in sub_deps}
 
-            df['employee_count'] = df.apply(
-                lambda row: handle_row_employee_count(row), axis=1)
+        for d in all_departments:
+            d['has_sub'] = sub_map.get(d['department_id'], 0)
 
-        else:
-            sub_map = {d['department_parent_id']: 1 for d in sub_df.to_dict('records')}
+            d_ids = DepartmentCRUD.get_department_id_list_by_root(d['department_id'], tree_list)
 
-            def handle_row(row):
-                d_ids = DepartmentCRUD.get_department_id_list_by_root(
-                    row['department_id'], tree_list)
-                row['employee_count'] = len(
-                    employee_df[employee_df['department_id'].isin(d_ids)])
+            d['employee_count'] = len(list(filter(lambda e: e['department_id'] in d_ids, all_employee_list)))
 
-                row['has_sub'] = sub_map.get(row['department_id'], 0)
-
-                return row
-
-            df = df.apply(lambda row: handle_row(row), axis=1)
-
-        return df.to_dict('records'), department_id_list
+        return all_departments, department_id_list
 
     @staticmethod
     def get_department_id_list_by_root(root_department_id, tree_list=None):
