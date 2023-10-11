@@ -9,6 +9,12 @@
 > **重要提示**: `master` 分支在开发过程中可能处于 _不稳定的状态_ 。
 > 请通过[releases](https://github.com/veops/acl/releases)获取
 
+## 系统介绍
+
+### 整体架构
+
+<img src=docs/images/infra.jpg />
+
 ### 主要功能
 
 - 支持基于角色、权限、资源的访问控制
@@ -47,6 +53,7 @@ docker-compose up -d
 
 ---
 
-_**欢迎关注我们的公众号，点击联系我们，加入微信、QQ运维群，获得更多产品、行业相关资讯**_
+_**欢迎关注公众号(维易科技OneOps)，关注后可加入微信群，进行产品和技术交流。**_
 
-![公众号](docs/qrcode_for_gzh.jpg)
+![公众号: 维易科技OneOps](docs/images/wechat.png)
+

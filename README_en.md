@@ -49,4 +49,4 @@
 
 _**Stay connected with us through our official WeChat account. Click to contact us and join our WeChat/QQ operations and maintenance groups to get more product and industry-related information.**_
 
-![WeChat QR Code](docs/qrcode_for_gzh.jpg)
+![veops](docs/images/wechat.png)
