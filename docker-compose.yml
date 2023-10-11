@@ -31,9 +31,6 @@ services:
 
   acl-api:
     image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:1.0
-#    build:
-#      context: .
-#      target: acl-api
     container_name: acl-api
     environment:
       TZ: Asia/Shanghai
@@ -58,9 +55,6 @@ services:
 
   acl-ui:
     image: registry.cn-hangzhou.aliyuncs.com/veops/acl-ui:1.0
-#    build:
-#      context: .
-#      target: acl-ui
     container_name: acl-ui
     depends_on:
       - acl-api
