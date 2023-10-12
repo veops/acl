@@ -3,7 +3,7 @@
 [![UI](https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen)](https://github.com/sendya/ant-design-pro-vue)
 [![API](https://img.shields.io/badge/API-Flask-brightgreen)](https://github.com/pallets/flask)
 
-[English](README_en.md) / [中文](README.md)
+[English](README_en.md) / [中文](../README.md)
 
 > **Important Note**: The `master` branch may be in an _unstable state_ during development.
 > Please refer to [releases](https://github.com/veops/acl/releases) for stable versions.
@@ -41,12 +41,12 @@
 - password: 123456
 
 
-### [Local Setup](docs/local.md)
+### [Local Setup](local.md)
 
-### [Installation with Makefile](docs/makefile.md)
+### [Installation with Makefile](makefile.md)
 
 ---
 
 _**Stay connected with us through our official WeChat account. Click to contact us and join our WeChat/QQ operations and maintenance groups to get more product and industry-related information.**_
 
-![veops](docs/images/wechat.png)
+![veops](images/wechat.png)

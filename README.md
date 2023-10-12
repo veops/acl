@@ -3,8 +3,12 @@
 [![UI](https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen)](https://github.com/sendya/ant-design-pro-vue)
 [![API](https://img.shields.io/badge/API-Flask-brightgreen)](https://github.com/pallets/flask)
 
-[English](README_en.md) / [中文](README.md)
-
+[English](docs/README_en.md) / [中文](README.md)
+- 产品介绍：<a href="https://mp.weixin.qq.com/s/nFdLJnxkiLYOJlgyuqQ2LQ" target="_blank">一个简单通用的权限管理系统设计与实践
+</a>
+- 在线体验：<a href="https://cmdb.veops.cn/acl" target="_blank">ACL</a>
+  - username: admin
+  - password: 123456
 
 > **重要提示**: `master` 分支在开发过程中可能处于 _不稳定的状态_ 。
 > 请通过[releases](https://github.com/veops/acl/releases)获取
