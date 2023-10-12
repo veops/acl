@@ -4,8 +4,7 @@
 [![API](https://img.shields.io/badge/API-Flask-brightgreen)](https://github.com/pallets/flask)
 
 [English](docs/README_en.md) / [中文](README.md)
-- 产品介绍：<a href="https://mp.weixin.qq.com/s/nFdLJnxkiLYOJlgyuqQ2LQ" target="_blank">一个简单通用的权限管理系统设计与实践
-</a>
+- 产品介绍：<a href="https://mp.weixin.qq.com/s/nFdLJnxkiLYOJlgyuqQ2LQ" target="_blank">一个简单通用的权限管理系统设计与实践</a>
 - 在线体验：<a href="https://cmdb.veops.cn/acl" target="_blank">ACL</a>
   - username: admin
   - password: 123456
@@ -21,7 +20,7 @@
 
 ### 主要功能
 
-- 支持基于角色、权限、资源的访问控制
+- 基于角色、权限、资源的访问控制
   - 角色继承，分为全局角色和应用角色
   - 可定义资源组
 - 支持接入多个应用，权限可按应用实现完全隔离
