@@ -53,27 +53,6 @@
       <vxe-column field="mobile" title="手机号" min-width="80"></vxe-column>
       <vxe-column field="position_name" title="岗位" min-width="80"></vxe-column>
       <vxe-column field="department_name" title="部门" min-width="80"></vxe-column>
-      <vxe-column field="entry_date" title="目前主体入职日期" min-width="120"></vxe-column>
-      <vxe-column field="is_internship" title="正式/实习生" min-width="120"></vxe-column>
-      <vxe-column field="leave_date" title="离职日期" min-width="120"></vxe-column>
-      <vxe-column field="id_card" title="身份证号码" min-width="120"></vxe-column>
-      <vxe-column field="nation" title="民族" min-width="80"></vxe-column>
-      <vxe-column field="id_place" title="籍贯" min-width="80"></vxe-column>
-      <vxe-column field="party" title="组织关系" min-width="80"></vxe-column>
-      <vxe-column field="household_registration_type" title="户籍类型" min-width="80"></vxe-column>
-      <vxe-column field="hometown" title="户口所在地" min-width="80"></vxe-column>
-      <vxe-column field="marry" title="婚姻情况" min-width="80"></vxe-column>
-      <vxe-column field="max_degree" title="最高学历" min-width="80"></vxe-column>
-      <vxe-column field="emergency_person" title="紧急联系人" min-width="120"></vxe-column>
-      <vxe-column field="emergency_phone" title="紧急联系电话" min-width="120"></vxe-column>
-      <vxe-column field="bank_card_number" title="卡号" min-width="120"></vxe-column>
-      <vxe-column field="bank_card_name" title="银行" min-width="80"></vxe-column>
-      <vxe-column field="opening_bank" title="开户行" min-width="80"></vxe-column>
-      <vxe-column field="account_opening_location" title="开户地" min-width="120"></vxe-column>
-      <vxe-column field="school" title="学校" min-width="80"></vxe-column>
-      <vxe-column field="major" title="专业" min-width="80"></vxe-column>
-      <vxe-column field="education" title="学历" min-width="80"></vxe-column>
-      <vxe-column field="graduation_year" title="毕业年份" min-width="120"></vxe-column>
       <vxe-column v-if="has_error" field="err" title="失败原因" min-width="120" fixed="right">
         <template #default="{ row }">
           <span :style="{ color: '#D81E06' }">{{ row.err }}</span>
