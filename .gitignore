@@ -41,7 +41,7 @@ nosetests.xml
 acl-api/test-output
 
 # Translations
-*.mo
+#*.mo
 
 # Mr Developer
 .mr.developer.cfg
