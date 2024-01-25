@@ -15,7 +15,7 @@
  */
 
 export default {
-  useSSO: false,
+  useSSO: true,
   ssoLoginUrl: '/api/sso/login',
   primaryColor: '#1890ff', // primary color of ant design
   navTheme: 'dark', // theme for nav menu

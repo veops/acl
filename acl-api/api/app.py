@@ -4,33 +4,29 @@ import datetime
 import decimal
 import logging
 import os
-import sys
 from inspect import getmembers
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
+import sys
 from flask import Flask
-from flask import make_response, jsonify
+from flask import jsonify
+from flask import make_response
+from flask import request
 from flask.blueprints import Blueprint
 from flask.cli import click
 from flask.json.provider import DefaultJSONProvider
+from flask_babel.speaklater import LazyString
 
 import api.views.entry
-from api.extensions import (
-    bcrypt,
-    cors,
-    cache,
-    db,
-    login_manager,
-    migrate,
-    celery,
-    rd,
-)
-from api.flask_cas import CAS
+from api.extensions import (bcrypt, babel, cache, celery, cors, db, login_manager, migrate, rd)
+from api.lib.perm.authentication.cas import CAS
+from api.lib.perm.authentication.oauth2 import OAuth2
 from api.models.acl import User
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.join(HERE, os.pardir)
-API_PACKAGE = "api"
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 @login_manager.user_loader
@@ -76,22 +72,13 @@ class ReverseProxy(object):
 
 class MyJSONEncoder(DefaultJSONProvider):
     def default(self, o):
-        if isinstance(o, (decimal.Decimal, datetime.date, datetime.time)):
+        if isinstance(o, (decimal.Decimal, datetime.date, datetime.time, LazyString)):
             return str(o)
 
         if isinstance(o, datetime.datetime):
             return o.strftime('%Y-%m-%d %H:%M:%S')
 
         return o
-
-
-def create_acl_app(config_object="settings"):
-    app = Flask(__name__.split(".")[0])
-    app.config.from_object(config_object)
-
-    register_extensions(app)
-
-    return app
 
 
 def create_app(config_object="settings"):
@@ -110,6 +97,7 @@ def create_app(config_object="settings"):
     register_shell_context(app)
     register_commands(app)
     CAS(app)
+    OAuth2(app)
     app.wsgi_app = ReverseProxy(app.wsgi_app)
     configure_upload_dir(app)
 
@@ -129,12 +117,18 @@ def configure_upload_dir(app):
 
 def register_extensions(app):
     """Register Flask extensions."""
+
+    def get_locale():
+        accept_languages = app.config.get('ACCEPT_LANGUAGES', ['en', 'zh'])
+        return request.accept_languages.best_match(accept_languages)
+
     bcrypt.init_app(app)
+    babel.init_app(app, locale_selector=get_locale)
     cache.init_app(app)
     db.init_app(app)
     cors.init_app(app)
     login_manager.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, directory=f"{BASE_DIR}/migrations")
     rd.init_app(app)
 
     app.config.update(app.config.get("CELERY"))
@@ -157,10 +151,8 @@ def register_error_handlers(app):
         error_code = getattr(error, "code", 500)
         if not str(error_code).isdigit():
             error_code = 400
-        if error_code != 500:
-            return make_response(jsonify(message=str(error)), error_code)
-        else:
-            return make_response(jsonify(message=traceback.format_exc(-1)), error_code)
+
+        return make_response(jsonify(message=str(error)), error_code)
 
     for errcode in app.config.get("ERROR_CODES") or [400, 401, 403, 404, 405, 500, 502]:
         app.errorhandler(errcode)(render_error)
@@ -183,9 +175,8 @@ def register_commands(app):
     for root, _, files in os.walk(os.path.join(HERE, "commands")):
         for filename in files:
             if not filename.startswith("_") and filename.endswith("py"):
-                module_path = os.path.join(API_PACKAGE, root[root.index("commands"):])
-                if module_path not in sys.path:
-                    sys.path.insert(1, module_path)
+                if root not in sys.path:
+                    sys.path.insert(1, root)
                 command = __import__(os.path.splitext(filename)[0])
                 func_list = [o[0] for o in getmembers(command) if isinstance(o[1], click.core.Command)]
                 for func_name in func_list:
@@ -203,10 +194,11 @@ def configure_logger(app):
         app.logger.addHandler(handler)
 
     log_file = app.config['LOG_PATH']
-    file_handler = RotatingFileHandler(log_file,
-                                       maxBytes=2 ** 30,
-                                       backupCount=7)
-    file_handler.setLevel(getattr(logging, app.config['LOG_LEVEL']))
-    file_handler.setFormatter(formatter)
-    app.logger.addHandler(file_handler)
+    if log_file and log_file != "/dev/stdout":
+        file_handler = RotatingFileHandler(log_file,
+                                           maxBytes=2 ** 30,
+                                           backupCount=7)
+        file_handler.setLevel(getattr(logging, app.config['LOG_LEVEL']))
+        file_handler.setFormatter(formatter)
+        app.logger.addHandler(file_handler)
     app.logger.setLevel(getattr(logging, app.config['LOG_LEVEL']))

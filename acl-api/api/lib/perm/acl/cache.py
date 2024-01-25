@@ -4,7 +4,7 @@
 import msgpack
 
 from api.extensions import cache
-from api.extensions import db
+from api.lib.decorator import flush_db
 from api.lib.utils import Lock
 from api.models.acl import App
 from api.models.acl import Permission
@@ -60,15 +60,15 @@ class UserCache(object):
 
     @classmethod
     def get(cls, key):
-        user = cache.get(cls.PREFIX_ID.format(key)) or \
-               cache.get(cls.PREFIX_NAME.format(key)) or \
-               cache.get(cls.PREFIX_NICK.format(key)) or \
-               cache.get(cls.PREFIX_WXID.format(key))
+        user = (cache.get(cls.PREFIX_ID.format(key)) or
+                cache.get(cls.PREFIX_NAME.format(key)) or
+                cache.get(cls.PREFIX_NICK.format(key)) or
+                cache.get(cls.PREFIX_WXID.format(key)))
         if not user:
-            user = User.query.get(key) or \
-                   User.query.get_by_username(key) or \
-                   User.query.get_by_nickname(key) or \
-                   User.query.get_by_wxid(key)
+            user = (User.query.get(key) or
+                    User.query.get_by_username(key) or
+                    User.query.get_by_nickname(key) or
+                    User.query.get_by_wxid(key))
         if user:
             cls.set(user)
 
@@ -221,9 +221,9 @@ class RoleRelationCache(object):
         return msgpack.loads(r_g, raw=False)
 
     @classmethod
+    @flush_db
     def rebuild(cls, rid, app_id):
         cls.clean(rid, app_id)
-        db.session.remove()
 
         cls.get_parent_ids(rid, app_id)
         cls.get_child_ids(rid, app_id)
@@ -235,9 +235,9 @@ class RoleRelationCache(object):
         cls.get_resources2(rid, app_id)
 
     @classmethod
+    @flush_db
     def rebuild2(cls, rid, app_id):
         cache.delete(cls.PREFIX_RESOURCES2.format(rid, app_id))
-        db.session.remove()
         cls.get_resources2(rid, app_id)
 
     @classmethod

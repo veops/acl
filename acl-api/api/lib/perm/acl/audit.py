@@ -1,16 +1,29 @@
 # -*- coding:utf-8 -*-
+
+import datetime
 import itertools
 import json
 from enum import Enum
 from typing import List
 
-from flask import g, has_request_context, request
+from flask import has_request_context
+from flask import request
 from flask_login import current_user
 from sqlalchemy import func
 
+from api.extensions import db
 from api.lib.perm.acl import AppCache
-from api.models.acl import AuditPermissionLog, AuditResourceLog, AuditRoleLog, AuditTriggerLog, Permission, Resource, \
-    ResourceGroup, ResourceType, Role, RolePermission
+from api.models.acl import AuditLoginLog
+from api.models.acl import AuditPermissionLog
+from api.models.acl import AuditResourceLog
+from api.models.acl import AuditRoleLog
+from api.models.acl import AuditTriggerLog
+from api.models.acl import Permission
+from api.models.acl import Resource
+from api.models.acl import ResourceGroup
+from api.models.acl import ResourceType
+from api.models.acl import Role
+from api.models.acl import RolePermission
 
 
 class AuditScope(str, Enum):
@@ -49,9 +62,7 @@ class AuditCRUD(object):
 
     @staticmethod
     def get_current_operate_uid(uid=None):
-
-        user_id = uid or (hasattr(g, 'user') and getattr(current_user, 'uid', None)) \
-                  or getattr(current_user, 'user_id', None)
+        user_id = uid or (getattr(current_user, 'uid', None)) or getattr(current_user, 'user_id', None)
 
         if has_request_context() and request.headers.get('X-User-Id'):
             _user_id = request.headers['X-User-Id']
@@ -93,11 +104,8 @@ class AuditCRUD(object):
                 criterion.append(AuditPermissionLog.operate_type == v)
 
         records = AuditPermissionLog.query.filter(
-            AuditPermissionLog.deleted == 0,
-            *criterion) \
-            .order_by(AuditPermissionLog.id.desc()) \
-            .offset((page - 1) * page_size) \
-            .limit(page_size).all()
+            AuditPermissionLog.deleted == 0, *criterion).order_by(
+            AuditPermissionLog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         data = {
             'data': [r.to_dict() for r in records],
@@ -160,10 +168,8 @@ class AuditCRUD(object):
             elif k == 'operate_type':
                 criterion.append(AuditRoleLog.operate_type == v)
 
-        records = AuditRoleLog.query.filter(AuditRoleLog.deleted == 0, *criterion) \
-            .order_by(AuditRoleLog.id.desc()) \
-            .offset((page - 1) * page_size) \
-            .limit(page_size).all()
+        records = AuditRoleLog.query.filter(AuditRoleLog.deleted == 0, *criterion).order_by(
+            AuditRoleLog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         data = {
             'data': [r.to_dict() for r in records],
@@ -225,11 +231,8 @@ class AuditCRUD(object):
                 criterion.append(AuditResourceLog.operate_type == v)
 
         records = AuditResourceLog.query.filter(
-            AuditResourceLog.deleted == 0,
-            *criterion) \
-            .order_by(AuditResourceLog.id.desc()) \
-            .offset((page - 1) * page_size) \
-            .limit(page_size).all()
+            AuditResourceLog.deleted == 0, *criterion).order_by(
+            AuditResourceLog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         data = {
             'data': [r.to_dict() for r in records],
@@ -259,11 +262,8 @@ class AuditCRUD(object):
                 criterion.append(AuditTriggerLog.operate_type == v)
 
         records = AuditTriggerLog.query.filter(
-            AuditTriggerLog.deleted == 0,
-            *criterion) \
-            .order_by(AuditTriggerLog.id.desc()) \
-            .offset((page - 1) * page_size) \
-            .limit(page_size).all()
+            AuditTriggerLog.deleted == 0, *criterion).order_by(
+            AuditTriggerLog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         data = {
             'data': [r.to_dict() for r in records],
@@ -285,6 +285,27 @@ class AuditCRUD(object):
         if resource_type_ids:
             resource_types = ResourceType.query.filter(ResourceType.id.in_(resource_type_ids)).all()
             data['id2resource_types'] = {r.id: r.to_dict() for r in resource_types}
+
+        return data
+
+    @staticmethod
+    def search_login(_, q=None, page=1, page_size=10, start=None, end=None):
+        query = db.session.query(AuditLoginLog)
+
+        if start:
+            query = query.filter(AuditLoginLog.login_at >= start)
+        if end:
+            query = query.filter(AuditLoginLog.login_at <= end)
+
+        if q:
+            query = query.filter(AuditLoginLog.username == q)
+
+        records = query.order_by(
+            AuditLoginLog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+        data = {
+            'data': [r.to_dict() for r in records],
+        }
 
         return data
 
@@ -353,3 +374,30 @@ class AuditCRUD(object):
         AuditTriggerLog.create(app_id=app_id, trigger_id=trigger_id, operate_uid=user_id,
                                operate_type=operate_type.value,
                                origin=origin, current=current, extra=extra, source=source.value)
+
+    @classmethod
+    def add_login_log(cls, username, is_ok, description, _id=None, logout_at=None):
+        if _id is not None:
+            existed = AuditLoginLog.get_by_id(_id)
+            if existed is not None:
+                existed.update(logout_at=logout_at)
+                return
+
+        payload = dict(username=username,
+                       is_ok=is_ok,
+                       description=description,
+                       logout_at=logout_at,
+                       ip=request.headers.get('X-Real-IP') or request.remote_addr,
+                       browser=request.headers.get('User-Agent'),
+                       )
+
+        if logout_at is None:
+            payload['login_at'] = datetime.datetime.now()
+
+        try:
+            from api.lib.common_setting.employee import EmployeeCRUD
+            EmployeeCRUD.update_last_login_by_uid(current_user.uid)
+        except:
+            pass
+
+        return AuditLoginLog.create(**payload).id

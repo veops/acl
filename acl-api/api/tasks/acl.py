@@ -5,26 +5,30 @@ import re
 
 from celery_once import QueueOnce
 from flask import current_app
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import NotFound
 
 from api.extensions import celery
-from api.extensions import db
+from api.lib.decorator import flush_db
+from api.lib.decorator import reconnect_db
+from api.lib.perm.acl.audit import AuditCRUD
+from api.lib.perm.acl.audit import AuditOperateSource
+from api.lib.perm.acl.audit import AuditOperateType
 from api.lib.perm.acl.cache import AppCache
 from api.lib.perm.acl.cache import RoleCache
 from api.lib.perm.acl.cache import RoleRelationCache
 from api.lib.perm.acl.cache import UserCache
 from api.lib.perm.acl.const import ACL_QUEUE
 from api.lib.perm.acl.record import OperateRecordCRUD
-from api.lib.perm.acl.audit import AuditCRUD, AuditOperateType, AuditOperateSource
 from api.models.acl import Resource
 from api.models.acl import Role
 from api.models.acl import Trigger
 
 
-@celery.task(base=QueueOnce,
-             name="acl.role_rebuild",
-             queue=ACL_QUEUE,
-             once={"graceful": True, "unlock_before_run": True})
+@celery.task(name="acl.role_rebuild",
+             queue=ACL_QUEUE,)
+@flush_db
+@reconnect_db
 def role_rebuild(rids, app_id):
     rids = rids if isinstance(rids, list) else [rids]
     for rid in rids:
@@ -34,6 +38,7 @@ def role_rebuild(rids, app_id):
 
 
 @celery.task(name="acl.update_resource_to_build_role", queue=ACL_QUEUE)
+@reconnect_db
 def update_resource_to_build_role(resource_id, app_id, group_id=None):
     rids = [i.id for i in Role.get_by(__func_isnot__key_uid=None, fl='id', to_dict=False)]
     rids += [i.id for i in Role.get_by(app_id=app_id, fl='id', to_dict=False)]
@@ -49,9 +54,9 @@ def update_resource_to_build_role(resource_id, app_id, group_id=None):
 
 
 @celery.task(name="acl.apply_trigger", queue=ACL_QUEUE)
+@flush_db
+@reconnect_db
 def apply_trigger(_id, resource_id=None, operator_uid=None):
-    db.session.remove()
-
     from api.lib.perm.acl.permission import PermissionCRUD
 
     trigger = Trigger.get_by_id(_id)
@@ -115,9 +120,9 @@ def apply_trigger(_id, resource_id=None, operator_uid=None):
 
 
 @celery.task(name="acl.cancel_trigger", queue=ACL_QUEUE)
+@flush_db
+@reconnect_db
 def cancel_trigger(_id, resource_id=None, operator_uid=None):
-    db.session.remove()
-
     from api.lib.perm.acl.permission import PermissionCRUD
 
     trigger = Trigger.get_by_id(_id)
@@ -183,18 +188,19 @@ def cancel_trigger(_id, resource_id=None, operator_uid=None):
 
 
 @celery.task(name="acl.op_record", queue=ACL_QUEUE)
-def op_record(app, rolename, operate_type, obj):
+@reconnect_db
+def op_record(app, role_name, operate_type, obj):
     if isinstance(app, int):
         app = AppCache.get(app)
         app = app and app.name
 
-    if isinstance(rolename, int):
-        u = UserCache.get(rolename)
+    if isinstance(role_name, int):
+        u = UserCache.get(role_name)
         if u:
-            rolename = u.username
+            role_name = u.username
         if not u:
-            r = RoleCache.get(rolename)
+            r = RoleCache.get(role_name)
             if r:
-                rolename = r.name
+                role_name = r.name
 
-    OperateRecordCRUD.add(app, rolename, operate_type, obj)
+    OperateRecordCRUD.add(app, role_name, operate_type, obj)

@@ -5,8 +5,10 @@ import hashlib
 
 import requests
 import six
-from flask import abort, session
-from flask import current_app, request
+from flask import abort
+from flask import current_app
+from flask import request
+from flask import session
 from flask_login import current_user
 
 from api.extensions import cache
@@ -57,7 +59,7 @@ class AccessTokenCache(object):
 
 class ACLManager(object):
     def __init__(self, app=None):
-        self.app = AppCache.get(app or 'acl')
+        self.app = AppCache.get(app or 'cmdb')
         if not self.app:
             raise Exception(ErrFormat.app_not_found.format(app))
         self.app_id = self.app.id
@@ -85,8 +87,8 @@ class ACLManager(object):
         if user:
             return Role.get_by(name=name, uid=user.uid, first=True, to_dict=False)
 
-        return Role.get_by(name=name, app_id=self.app_id, first=True, to_dict=False) or \
-               Role.get_by(name=name, first=True, to_dict=False)
+        return (Role.get_by(name=name, app_id=self.app_id, first=True, to_dict=False) or
+                Role.get_by(name=name, first=True, to_dict=False))
 
     def add_resource(self, name, resource_type_name=None):
         resource_type = ResourceType.get_by(name=resource_type_name, first=True, to_dict=False)
@@ -115,15 +117,15 @@ class ACLManager(object):
             if group:
                 PermissionCRUD.grant(role.id, permissions, group_id=group.id)
 
-    def grant_resource_to_role_by_rid(self, name, rid, resource_type_name=None, permissions=None):
+    def grant_resource_to_role_by_rid(self, name, rid, resource_type_name=None, permissions=None, rebuild=True):
         resource = self._get_resource(name, resource_type_name)
 
         if resource:
-            PermissionCRUD.grant(rid, permissions, resource_id=resource.id)
+            PermissionCRUD.grant(rid, permissions, resource_id=resource.id, rebuild=rebuild)
         else:
             group = self._get_resource_group(name)
             if group:
-                PermissionCRUD.grant(rid, permissions, group_id=group.id)
+                PermissionCRUD.grant(rid, permissions, group_id=group.id, rebuild=rebuild)
 
     def revoke_resource_from_role(self, name, role, resource_type_name=None, permissions=None):
         resource = self._get_resource(name, resource_type_name)
@@ -136,20 +138,20 @@ class ACLManager(object):
             if group:
                 PermissionCRUD.revoke(role.id, permissions, group_id=group.id)
 
-    def revoke_resource_from_role_by_rid(self, name, rid, resource_type_name=None, permissions=None):
+    def revoke_resource_from_role_by_rid(self, name, rid, resource_type_name=None, permissions=None, rebuild=True):
         resource = self._get_resource(name, resource_type_name)
 
         if resource:
-            PermissionCRUD.revoke(rid, permissions, resource_id=resource.id)
+            PermissionCRUD.revoke(rid, permissions, resource_id=resource.id, rebuild=rebuild)
         else:
             group = self._get_resource_group(name)
             if group:
-                PermissionCRUD.revoke(rid, permissions, group_id=group.id)
+                PermissionCRUD.revoke(rid, permissions, group_id=group.id, rebuild=rebuild)
 
     def del_resource(self, name, resource_type_name=None):
         resource = self._get_resource(name, resource_type_name)
         if resource:
-            ResourceCRUD.delete(resource.id)
+            return ResourceCRUD.delete(resource.id)
 
     def has_permission(self, resource_name, resource_type, perm, resource_id=None):
         if is_app_admin(self.app_id):
@@ -246,7 +248,7 @@ def has_perm(resources, resource_type, perm, app=None):
 
 
 def is_app_admin(app=None):
-    app = app or 'acl'
+    app = app or 'cmdb'
     app = AppCache.get(app)
     if app is None:
         return False

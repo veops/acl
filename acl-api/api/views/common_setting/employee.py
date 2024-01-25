@@ -1,7 +1,5 @@
 # -*- coding:utf-8 -*-
-import os
-
-from flask import abort, current_app, send_from_directory
+from flask import abort
 from flask import request
 from werkzeug.datastructures import MultiDict
 
@@ -145,3 +143,26 @@ class EmployeePositionView(APIView):
         result = EmployeeCRUD.get_all_position()
         return self.jsonify(result)
 
+
+class GetEmployeeNoticeByIds(APIView):
+    url_prefix = (f'{prefix}/get_notice_by_ids',)
+
+    def post(self):
+        employee_ids = request.json.get('employee_ids', [])
+        if not employee_ids:
+            result = []
+        else:
+            result = EmployeeCRUD.get_employee_notice_by_ids(employee_ids)
+        return self.jsonify(result)
+
+
+class EmployeeBindNoticeWithACLID(APIView):
+    url_prefix = (f'{prefix}/by_uid/bind_notice/<string:platform>/<int:_uid>',)
+
+    def put(self, platform, _uid):
+        data = EmployeeCRUD.bind_notice_by_uid(platform, _uid)
+        return self.jsonify(info=data)
+
+    def delete(self, platform, _uid):
+        data = EmployeeCRUD.remove_bind_notice_by_uid(platform, _uid)
+        return self.jsonify(info=data)

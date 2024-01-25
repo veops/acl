@@ -1,11 +1,13 @@
 # -*- coding:utf-8 -*- 
 
-import sys
-import time
+import base64
 from typing import Set
 
 import redis
 import six
+import sys
+import time
+from Crypto.Cipher import AES
 from flask import current_app
 
 
@@ -108,7 +110,7 @@ class RedisHandler(object):
         try:
             ret = self.r.hdel(prefix, key_id)
             if not ret:
-                current_app.logger.warn("[{0}] is not in redis".format(key_id))
+                current_app.logger.warning("[{0}] is not in redis".format(key_id))
         except Exception as e:
             current_app.logger.error("delete redis key error, {0}".format(str(e)))
 
@@ -157,3 +159,35 @@ class Lock(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.need_lock:
             self.release()
+
+
+class AESCrypto(object):
+    BLOCK_SIZE = 16  # Bytes
+    pad = lambda s: s + ((AESCrypto.BLOCK_SIZE - len(s) % AESCrypto.BLOCK_SIZE) *
+                         chr(AESCrypto.BLOCK_SIZE - len(s) % AESCrypto.BLOCK_SIZE))
+    unpad = lambda s: s[:-ord(s[len(s) - 1:])]
+
+    iv = '0102030405060708'
+
+    @staticmethod
+    def key():
+        key = current_app.config.get("SECRET_KEY")[:16]
+        if len(key) < 16:
+            key = "{}{}".format(key, (16 - len(key)) * "x")
+
+        return key.encode('utf8')
+
+    @classmethod
+    def encrypt(cls, data):
+        data = cls.pad(data)
+        cipher = AES.new(cls.key(), AES.MODE_CBC, cls.iv.encode('utf8'))
+
+        return base64.b64encode(cipher.encrypt(data.encode('utf8'))).decode('utf8')
+
+    @classmethod
+    def decrypt(cls, data):
+        encode_bytes = base64.decodebytes(data.encode('utf8'))
+        cipher = AES.new(cls.key(), AES.MODE_CBC, cls.iv.encode('utf8'))
+        text_decrypted = cipher.decrypt(encode_bytes)
+
+        return cls.unpad(text_decrypted).decode('utf8')
