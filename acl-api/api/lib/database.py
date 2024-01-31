@@ -10,17 +10,21 @@ from api.lib.exception import CommitException
 
 class FormatMixin(object):
     def to_dict(self):
-        res = dict([(k, getattr(self, k) if not isinstance(
-            getattr(self, k), (datetime.datetime, datetime.date, datetime.time)) else str(
-            getattr(self, k))) for k in getattr(self, "__mapper__").c.keys()])
-        # FIXME: getattr(cls, "__table__").columns  k.name
+        res = dict()
+        for k in getattr(self, "__mapper__").c.keys():
+            if k in {'password', '_password', 'secret', '_secret'}:
+                continue
 
-        res.pop('password', None)
-        res.pop('_password', None)
-        res.pop('secret', None)
+            if k.startswith('_'):
+                k = k[1:]
+
+            if not isinstance(getattr(self, k), (datetime.datetime, datetime.date, datetime.time)):
+                res[k] = getattr(self, k)
+            else:
+                res[k] = str(getattr(self, k))
 
         return res
-    
+
     @classmethod
     def from_dict(cls, **kwargs):
         from sqlalchemy.sql.sqltypes import Time, Date, DateTime
@@ -80,17 +84,17 @@ class CRUDMixin(FormatMixin):
             db.session.rollback()
             raise CommitException(str(e))
 
-    def soft_delete(self, flush=False):
+    def soft_delete(self, flush=False, commit=True):
         setattr(self, "deleted", True)
         setattr(self, "deleted_at", datetime.datetime.now())
-        self.save(flush=flush)
+        self.save(flush=flush, commit=commit)
 
     @classmethod
     def get_by_id(cls, _id):
         if any((isinstance(_id, six.string_types) and _id.isdigit(),
                 isinstance(_id, (six.integer_types, float))), ):
             obj = getattr(cls, "query").get(int(_id))
-            if obj and not obj.deleted:
+            if obj and not getattr(obj, 'deleted', False):
                 return obj
 
     @classmethod
@@ -138,8 +142,11 @@ class CRUDMixin(FormatMixin):
         return result[0] if first and result else (None if first else result)
 
     @classmethod
-    def get_by_like(cls, to_dict=True, **kwargs):
+    def get_by_like(cls, to_dict=True, deleted=False, **kwargs):
         query = db.session.query(cls)
+        if hasattr(cls, "deleted") and deleted is not None:
+            query = query.filter(cls.deleted.is_(deleted))
+
         for k, v in kwargs.items():
             query = query.filter(getattr(cls, k).ilike('%{0}%'.format(v)))
         return [i.to_dict() if to_dict else i for i in query]

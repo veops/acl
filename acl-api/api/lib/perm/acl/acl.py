@@ -59,7 +59,7 @@ class AccessTokenCache(object):
 
 class ACLManager(object):
     def __init__(self, app=None):
-        self.app = AppCache.get(app or 'cmdb')
+        self.app = AppCache.get(app or 'acl')
         if not self.app:
             raise Exception(ErrFormat.app_not_found.format(app))
         self.app_id = self.app.id
