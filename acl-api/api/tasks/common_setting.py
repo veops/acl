@@ -3,7 +3,6 @@ from flask import current_app
 
 from api.extensions import celery
 from api.lib.common_setting.acl import ACLManager
-from api.lib.common_setting.employee import GrantEmployeeACLPerm
 from api.lib.common_setting.resp_format import ErrFormat
 from api.lib.decorator import flush_db
 from api.lib.decorator import reconnect_db
@@ -124,6 +123,8 @@ def refresh_employee_acl_info(current_employee_id=None):
 
     if current_employee_rid and current_employee_rid > 0:
         try:
+            from api.lib.common_setting.employee import GrantEmployeeACLPerm
+
             GrantEmployeeACLPerm().grant_by_rid(current_employee_rid, False)
             current_app.logger.info(f"GrantEmployeeACLPerm success, current_employee_rid: {current_employee_rid}")
         except Exception as e:
