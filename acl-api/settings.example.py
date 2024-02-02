@@ -66,26 +66,76 @@ ONCE = {
     }
 }
 
-# # SSO
-CAS_SERVER = "http://sso.xxx.com"
-CAS_VALIDATE_SERVER = "http://sso.xxx.com"
-CAS_LOGIN_ROUTE = "/cas/login"
-CAS_LOGOUT_ROUTE = "/cas/logout"
-CAS_VALIDATE_ROUTE = "/cas/serviceValidate"
-CAS_AFTER_LOGIN = "/"
-DEFAULT_SERVICE = "http://127.0.0.1:8000"
+# =============================== Authentication ===========================================================
 
-# # ldap
-AUTH_WITH_LDAP = False
-LDAP_SERVER = ''
-LDAP_DOMAIN = ''
+# # CAS
+CAS = dict(
+    enabled=False,
+    cas_server='https://{your-CASServer-hostname}',
+    cas_validate_server='https://{your-CASServer-hostname}',
+    cas_login_route='/cas/built-in/cas/login',
+    cas_logout_route='/cas/built-in/cas/logout',
+    cas_validate_route='/cas/built-in/cas/serviceValidate',
+    cas_after_login='/',
+    cas_user_map={
+        'username': {'tag': 'cas:user'},
+        'nickname': {'tag': 'cas:attribute', 'attrs': {'name': 'displayName'}},
+        'email': {'tag': 'cas:attribute', 'attrs': {'name': 'email'}},
+        'mobile': {'tag': 'cas:attribute', 'attrs': {'name': 'phone'}},
+        'avatar': {'tag': 'cas:attribute', 'attrs': {'name': 'avatar'}},
+    }
+)
+
+# # OAuth2.0
+OAUTH2 = dict(
+    enabled=False,
+    client_id='',
+    client_secret='',
+    authorize_url='https://{your-OAuth2Server-hostname}/login/oauth/authorize',
+    token_url='https://{your-OAuth2Server-hostname}/api/login/oauth/access_token',
+    scopes=['profile', 'email'],
+    user_info={
+        'url': 'https://{your-OAuth2Server-hostname}/api/userinfo',
+        'email': 'email',
+        'username': 'name',
+        'avatar': 'picture'
+    },
+    after_login='/'
+)
+
+# # OIDC
+OIDC = dict(
+    enabled=False,
+    client_id='',
+    client_secret='',
+    authorize_url='https://{your-OIDCServer-hostname}/login/oauth/authorize',
+    token_url='https://{your-OIDCServer-hostname}/api/login/oauth/access_token',
+    scopes=['openid', 'profile', 'email'],
+    user_info={
+        'url': 'https://{your-OIDCServer-hostname}/api/userinfo',
+        'email': 'email',
+        'username': 'name',
+        'avatar': 'picture'
+    },
+    after_login='/'
+)
+
+# # LDAP
+LDAP = dict(
+    enabled=False,
+    ldap_server='',
+    ldap_domain='',
+    ldap_user_dn='cn={},ou=users,dc=xxx,dc=com'
+)
+# ==========================================================================================================
+
 
 # # pagination
 DEFAULT_PAGE_COUNT = 50
 
 # # permission
 WHITE_LIST = ["127.0.0.1"]
-USE_ACL = False
+USE_ACL = True
 
 # # elastic search
 ES_HOST = '127.0.0.1'
