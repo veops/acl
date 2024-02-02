@@ -110,7 +110,7 @@ def refresh_employee_acl_info(current_employee_id=None):
             params['acl_rid'] = role.get('id', 0)
 
         if current_employee_id and em.employee_id == current_employee_id:
-            current_employee_rid = em.acl_rid if em.acl_rid else 0
+            current_employee_rid = params['acl_rid'] if params.get('acl_rid', 0) else 0
 
         try:
             em.update(**params)
