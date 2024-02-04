@@ -576,7 +576,6 @@ class EmployeeCRUD(object):
     @staticmethod
     def import_employee(employee_list):
         res = CreateEmployee().batch_create(employee_list)
-        refresh_employee_acl_info.apply_async(args=(), queue=ACL_QUEUE)
         return res
 
     @staticmethod
@@ -787,9 +786,11 @@ class CreateEmployee(object):
         if existed:
             return existed
 
-        return Employee.create(
+        res = Employee.create(
             **kwargs
         )
+        refresh_employee_acl_info.apply_async(args=(res.employee_id,), queue=ACL_QUEUE)
+        return res
 
     @staticmethod
     def get_department_by_name(d_name):
