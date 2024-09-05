@@ -16,9 +16,10 @@ from wtforms import validators
 from api.extensions import db
 from api.lib.common_setting.acl import ACLManager
 from api.lib.common_setting.const import OperatorType
-from api.lib.common_setting.resp_format import ErrFormat
 from api.lib.perm.acl.const import ACL_QUEUE
+from api.lib.common_setting.resp_format import ErrFormat
 from api.models.common_setting import Employee, Department
+
 from api.tasks.common_setting import refresh_employee_acl_info, edit_employee_department_in_acl
 
 acl_user_columns = [
