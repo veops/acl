@@ -3,11 +3,11 @@ from flask import current_app
 
 from api.extensions import celery
 from api.lib.common_setting.acl import ACLManager
+from api.lib.perm.acl.const import ACL_QUEUE
 from api.lib.common_setting.resp_format import ErrFormat
+from api.models.common_setting import Department, Employee
 from api.lib.decorator import flush_db
 from api.lib.decorator import reconnect_db
-from api.lib.perm.acl.const import ACL_QUEUE
-from api.models.common_setting import Department, Employee
 
 
 @celery.task(name="common_setting.edit_employee_department_in_acl", queue=ACL_QUEUE)

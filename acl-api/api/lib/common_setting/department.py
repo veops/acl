@@ -553,6 +553,7 @@ class EditDepartmentInACL(object):
 
             cls.remove_single_employee_from_old_department(acl, employee, result)
 
+            # 在新部门中添加员工
             cls.add_employee_to_new_department(acl, employee_acl_rid, new_department_acl_rid, result)
 
         return result
