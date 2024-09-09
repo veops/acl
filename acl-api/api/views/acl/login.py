@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 
 import datetime
-
 import jwt
 import six
 from flask import abort
@@ -123,10 +122,17 @@ class AuthWithKeyView(APIView):
         if not user.get('username'):
             user['username'] = user.get('name')
 
-        return self.jsonify(user=user,
-                            authenticated=authenticated,
-                            rid=role and role.id,
-                            can_proxy=can_proxy)
+        result = dict(user=user,
+                      authenticated=authenticated,
+                      rid=role and role.id,
+                      can_proxy=can_proxy)
+
+        if request.values.get('need_parentRoles') in current_app.config.get('BOOL_TRUE'):
+            app_id = AppCache.get(request.values.get('app_id'))
+            parent_ids = RoleRelationCRUD.recursive_parent_ids(role and role.id, app_id and app_id.id)
+            result['user']['parentRoles'] = [RoleCache.get(rid).name for rid in set(parent_ids) if RoleCache.get(rid)]
+
+        return self.jsonify(result)
 
 
 class AuthWithTokenView(APIView):
@@ -183,6 +189,8 @@ class LogoutView(APIView):
     def post(self):
         logout_user()
 
-        AuditCRUD.add_login_log(None, None, None, _id=session.get('LOGIN_ID'), logout_at=datetime.datetime.now())
+        AuditCRUD.add_login_log(None, None, None,
+                                _id=session.get('LOGIN_ID') or request.values.get('LOGIN_ID'),
+                                logout_at=datetime.datetime.now())
 
         self.jsonify(code=200)
