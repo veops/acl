@@ -79,4 +79,4 @@ Werkzeug==0.15.5
 WTForms==3.0.0
 zipp==3.16.0
 python-magic==0.4.27
-
+python-redis-lock==4.0.0

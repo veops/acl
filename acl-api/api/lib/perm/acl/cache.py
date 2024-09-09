@@ -2,10 +2,12 @@
 
 
 import msgpack
+import redis_lock
 
 from api.extensions import cache
+from api.extensions import db
+from api.extensions import rd
 from api.lib.decorator import flush_db
-from api.lib.utils import Lock
 from api.models.acl import App
 from api.models.acl import Permission
 from api.models.acl import Resource
@@ -136,14 +138,14 @@ class HasResourceRoleCache(object):
 
     @classmethod
     def add(cls, rid, app_id):
-        with Lock('HasResourceRoleCache'):
+        with redis_lock.Lock(rd.r, 'HasResourceRoleCache'):
             c = cls.get(app_id)
             c[rid] = 1
             cache.set(cls.PREFIX_KEY.format(app_id), c, timeout=0)
 
     @classmethod
     def remove(cls, rid, app_id):
-        with Lock('HasResourceRoleCache'):
+        with redis_lock.Lock(rd.r, 'HasResourceRoleCache'):
             c = cls.get(app_id)
             c.pop(rid, None)
             cache.set(cls.PREFIX_KEY.format(app_id), c, timeout=0)
@@ -156,9 +158,10 @@ class RoleRelationCache(object):
     PREFIX_RESOURCES2 = "RoleRelationResources2::id::{0}::AppId::{1}"
 
     @classmethod
-    def get_parent_ids(cls, rid, app_id):
+    def get_parent_ids(cls, rid, app_id, force=False):
         parent_ids = cache.get(cls.PREFIX_PARENT.format(rid, app_id))
-        if not parent_ids:
+        if not parent_ids or force:
+            db.session.commit()
             from api.lib.perm.acl.role import RoleRelationCRUD
             parent_ids = RoleRelationCRUD.get_parent_ids(rid, app_id)
             cache.set(cls.PREFIX_PARENT.format(rid, app_id), parent_ids, timeout=0)
@@ -166,9 +169,10 @@ class RoleRelationCache(object):
         return parent_ids
 
     @classmethod
-    def get_child_ids(cls, rid, app_id):
+    def get_child_ids(cls, rid, app_id, force=False):
         child_ids = cache.get(cls.PREFIX_CHILDREN.format(rid, app_id))
-        if not child_ids:
+        if not child_ids or force:
+            db.session.commit()
             from api.lib.perm.acl.role import RoleRelationCRUD
             child_ids = RoleRelationCRUD.get_child_ids(rid, app_id)
             cache.set(cls.PREFIX_CHILDREN.format(rid, app_id), child_ids, timeout=0)
@@ -176,14 +180,16 @@ class RoleRelationCache(object):
         return child_ids
 
     @classmethod
-    def get_resources(cls, rid, app_id):
+    def get_resources(cls, rid, app_id, force=False):
         """
         :param rid: 
         :param app_id: 
+        :param force:
         :return: {id2perms: {resource_id: [perm,]}, group2perms: {group_id: [perm, ]}}
         """
         resources = cache.get(cls.PREFIX_RESOURCES.format(rid, app_id))
-        if not resources:
+        if not resources or force:
+            db.session.commit()
             from api.lib.perm.acl.role import RoleCRUD
             resources = RoleCRUD.get_resources(rid, app_id)
             if resources['id2perms'] or resources['group2perms']:
@@ -192,9 +198,10 @@ class RoleRelationCache(object):
         return resources or {}
 
     @classmethod
-    def get_resources2(cls, rid, app_id):
+    def get_resources2(cls, rid, app_id, force=False):
         r_g = cache.get(cls.PREFIX_RESOURCES2.format(rid, app_id))
-        if not r_g:
+        if not r_g or force:
+            db.session.commit()
             res = cls.get_resources(rid, app_id)
             id2perms = res['id2perms']
             group2perms = res['group2perms']
@@ -223,22 +230,28 @@ class RoleRelationCache(object):
     @classmethod
     @flush_db
     def rebuild(cls, rid, app_id):
-        cls.clean(rid, app_id)
-
-        cls.get_parent_ids(rid, app_id)
-        cls.get_child_ids(rid, app_id)
-        resources = cls.get_resources(rid, app_id)
-        if resources.get('id2perms') or resources.get('group2perms'):
-            HasResourceRoleCache.add(rid, app_id)
+        if app_id is None:
+            app_ids = [None] + [i.id for i in App.get_by(to_dict=False)]
         else:
-            HasResourceRoleCache.remove(rid, app_id)
-        cls.get_resources2(rid, app_id)
+            app_ids = [app_id]
+
+        for _app_id in app_ids:
+            cls.clean(rid, _app_id)
+
+            cls.get_parent_ids(rid, _app_id, force=True)
+            cls.get_child_ids(rid, _app_id, force=True)
+            resources = cls.get_resources(rid, _app_id, force=True)
+            if resources.get('id2perms') or resources.get('group2perms'):
+                HasResourceRoleCache.add(rid, _app_id)
+            else:
+                HasResourceRoleCache.remove(rid, _app_id)
+            cls.get_resources2(rid, _app_id, force=True)
 
     @classmethod
     @flush_db
     def rebuild2(cls, rid, app_id):
         cache.delete(cls.PREFIX_RESOURCES2.format(rid, app_id))
-        cls.get_resources2(rid, app_id)
+        cls.get_resources2(rid, app_id, force=True)
 
     @classmethod
     def clean(cls, rid, app_id):

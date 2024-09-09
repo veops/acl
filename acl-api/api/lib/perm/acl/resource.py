@@ -2,7 +2,6 @@
 
 
 from flask import abort
-from flask import current_app
 
 from api.extensions import db
 from api.lib.perm.acl.audit import AuditCRUD
@@ -127,11 +126,18 @@ class ResourceTypeCRUD(object):
         existed_ids = [i.id for i in existed]
         current_ids = []
 
+        rebuild_rids = set()
         for i in existed:
             if i.name not in perms:
-                i.soft_delete()
+                i.soft_delete(commit=False)
+                for rp in RolePermission.get_by(perm_id=i.id, to_dict=False):
+                    rp.soft_delete(commit=False)
+                    rebuild_rids.add((rp.app_id, rp.rid))
             else:
                 current_ids.append(i.id)
+        db.session.commit()
+        for _app_id, _rid in rebuild_rids:
+            role_rebuild.apply_async(args=(_rid, _app_id), queue=ACL_QUEUE)
 
         for i in perms:
             if i not in existed_names:
@@ -309,8 +315,11 @@ class ResourceCRUD(object):
         return resource
 
     @staticmethod
-    def delete(_id):
+    def delete(_id, rebuild=True, app_id=None):
         resource = Resource.get_by_id(_id) or abort(404, ErrFormat.resource_not_found.format("id={}".format(_id)))
+
+        if app_id is not None and resource.app_id != app_id:
+            return abort(404, ErrFormat.resource_not_found.format("id={}".format(_id)))
 
         origin = resource.to_dict()
         resource.soft_delete()
@@ -322,8 +331,9 @@ class ResourceCRUD(object):
             i.soft_delete()
             rebuilds.append((i.rid, i.app_id))
 
-        for rid, app_id in set(rebuilds):
-            role_rebuild.apply_async(args=(rid, app_id), queue=ACL_QUEUE)
+        if rebuild:
+            for rid, app_id in set(rebuilds):
+                role_rebuild.apply_async(args=(rid, app_id), queue=ACL_QUEUE)
 
         AuditCRUD.add_resource_log(resource.app_id, AuditOperateType.delete,
                                    AuditScope.resource, resource.id, origin, {}, {})

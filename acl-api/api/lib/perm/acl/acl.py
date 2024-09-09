@@ -59,7 +59,7 @@ class AccessTokenCache(object):
 
 class ACLManager(object):
     def __init__(self, app=None):
-        self.app = AppCache.get(app or 'acl')
+        self.app = AppCache.get(app or 'cmdb')
         if not self.app:
             raise Exception(ErrFormat.app_not_found.format(app))
         self.app_id = self.app.id
@@ -148,16 +148,16 @@ class ACLManager(object):
             if group:
                 PermissionCRUD.revoke(rid, permissions, group_id=group.id, rebuild=rebuild)
 
-    def del_resource(self, name, resource_type_name=None):
+    def del_resource(self, name, resource_type_name=None, rebuild=True):
         resource = self._get_resource(name, resource_type_name)
         if resource:
-            return ResourceCRUD.delete(resource.id)
+            return ResourceCRUD.delete(resource.id, rebuild=rebuild)
 
-    def has_permission(self, resource_name, resource_type, perm, resource_id=None):
+    def has_permission(self, resource_name, resource_type, perm, resource_id=None, rid=None):
         if is_app_admin(self.app_id):
             return True
 
-        role = self._get_role(current_user.username)
+        role = self._get_role(current_user.username) if rid is None else RoleCache.get(rid)
 
         role or abort(404, ErrFormat.role_not_found.format(current_user.username))
 

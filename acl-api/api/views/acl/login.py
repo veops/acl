@@ -16,10 +16,12 @@ from api.lib.decorator import args_required
 from api.lib.decorator import args_validate
 from api.lib.perm.acl.acl import ACLManager
 from api.lib.perm.acl.audit import AuditCRUD
+from api.lib.perm.acl.cache import AppCache
 from api.lib.perm.acl.cache import RoleCache
 from api.lib.perm.acl.cache import User
 from api.lib.perm.acl.cache import UserCache
 from api.lib.perm.acl.resp_format import ErrFormat
+from api.lib.perm.acl.role import RoleRelationCRUD
 from api.lib.perm.auth import auth_abandoned
 from api.lib.perm.auth import auth_with_app_token
 from api.models.acl import Role
@@ -37,8 +39,9 @@ class LoginView(APIView):
         username = request.values.get("username") or request.values.get("email")
         password = request.values.get("password")
         _role = None
+        auth_with_ldap = request.values.get('auth_with_ldap', True)
         config = AuthenticateDataCRUD(AuthenticateType.LDAP).get()
-        if config.get('enabled') or config.get('enable'):
+        if (config.get('enabled') or config.get('enable')) and auth_with_ldap:
             from api.lib.perm.authentication.ldap import authenticate_with_ldap
             user, authenticated = authenticate_with_ldap(username, password)
         else:

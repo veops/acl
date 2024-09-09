@@ -1,14 +1,14 @@
 # -*- coding:utf-8 -*-
 
 
-import time
-
+import redis_lock
 import six
 from flask import abort
 from flask import current_app
 from sqlalchemy import or_
 
 from api.extensions import db
+from api.extensions import rd
 from api.lib.perm.acl.app import AppCRUD
 from api.lib.perm.acl.audit import AuditCRUD, AuditOperateType, AuditScope
 from api.lib.perm.acl.cache import AppCache
@@ -62,7 +62,9 @@ class RoleRelationCRUD(object):
 
         id2parents = {}
         for i in res:
-            id2parents.setdefault(rid2uid.get(i.child_id, i.child_id), []).append(RoleCache.get(i.parent_id).to_dict())
+            parent = RoleCache.get(i.parent_id)
+            if parent:
+                id2parents.setdefault(rid2uid.get(i.child_id, i.child_id), []).append(parent.to_dict())
 
         return id2parents
 
@@ -70,7 +72,7 @@ class RoleRelationCRUD(object):
     def get_parent_ids(rid, app_id):
         if app_id is not None:
             return [i.parent_id for i in RoleRelation.get_by(child_id=rid, app_id=app_id, to_dict=False)] + \
-                   [i.parent_id for i in RoleRelation.get_by(child_id=rid, app_id=None, to_dict=False)]
+                [i.parent_id for i in RoleRelation.get_by(child_id=rid, app_id=None, to_dict=False)]
         else:
             return [i.parent_id for i in RoleRelation.get_by(child_id=rid, app_id=app_id, to_dict=False)]
 
@@ -78,7 +80,7 @@ class RoleRelationCRUD(object):
     def get_child_ids(rid, app_id):
         if app_id is not None:
             return [i.child_id for i in RoleRelation.get_by(parent_id=rid, app_id=app_id, to_dict=False)] + \
-                   [i.child_id for i in RoleRelation.get_by(parent_id=rid, app_id=None, to_dict=False)]
+                [i.child_id for i in RoleRelation.get_by(parent_id=rid, app_id=None, to_dict=False)]
         else:
             return [i.child_id for i in RoleRelation.get_by(parent_id=rid, app_id=app_id, to_dict=False)]
 
@@ -141,24 +143,27 @@ class RoleRelationCRUD(object):
 
     @classmethod
     def add(cls, role, parent_id, child_ids, app_id):
-        result = []
-        for child_id in child_ids:
-            existed = RoleRelation.get_by(parent_id=parent_id, child_id=child_id, app_id=app_id)
-            if existed:
-                continue
+        with redis_lock.Lock(rd.r, "ROLE_RELATION_ADD"):
+            db.session.commit()
 
-            RoleRelationCache.clean(parent_id, app_id)
-            RoleRelationCache.clean(child_id, app_id)
+            result = []
+            for child_id in child_ids:
+                existed = RoleRelation.get_by(parent_id=parent_id, child_id=child_id, app_id=app_id)
+                if existed:
+                    continue
 
-            if parent_id in cls.recursive_child_ids(child_id, app_id):
-                return abort(400, ErrFormat.inheritance_dead_loop)
+                if parent_id in cls.recursive_child_ids(child_id, app_id):
+                    return abort(400, ErrFormat.inheritance_dead_loop)
 
-            if app_id is None:
-                for app in AppCRUD.get_all():
-                    if app.name != "acl":
-                        RoleRelationCache.clean(child_id, app.id)
+                result.append(RoleRelation.create(parent_id=parent_id, child_id=child_id, app_id=app_id).to_dict())
 
-            result.append(RoleRelation.create(parent_id=parent_id, child_id=child_id, app_id=app_id).to_dict())
+                RoleRelationCache.clean(parent_id, app_id)
+                RoleRelationCache.clean(child_id, app_id)
+
+                if app_id is None:
+                    for app in AppCRUD.get_all():
+                        if app.name != "acl":
+                            RoleRelationCache.clean(child_id, app.id)
 
         AuditCRUD.add_role_log(app_id, AuditOperateType.role_relation_add,
                                AuditScope.role_relation, role.id, {}, {},
@@ -372,16 +377,16 @@ class RoleCRUD(object):
             resource_type_id = resource_type and resource_type.id
 
         result = dict(resources=dict(), groups=dict())
-        s = time.time()
+        # s = time.time()
         parent_ids = RoleRelationCRUD.recursive_parent_ids(rid, app_id)
-        current_app.logger.info('parent ids {0}: {1}'.format(parent_ids, time.time() - s))
+        # current_app.logger.info('parent ids {0}: {1}'.format(parent_ids, time.time() - s))
         for parent_id in parent_ids:
 
             _resources, _groups = cls._extend_resources(parent_id, resource_type_id, app_id)
-            current_app.logger.info('middle1: {0}'.format(time.time() - s))
+            # current_app.logger.info('middle1: {0}'.format(time.time() - s))
             _merge(result['resources'], _resources)
-            current_app.logger.info('middle2: {0}'.format(time.time() - s))
-            current_app.logger.info(len(_groups))
+            # current_app.logger.info('middle2: {0}'.format(time.time() - s))
+            # current_app.logger.info(len(_groups))
             if not group_flat:
                 _merge(result['groups'], _groups)
             else:
@@ -392,7 +397,7 @@ class RoleCRUD(object):
                             item.setdefault('permissions', [])
                             item['permissions'] = list(set(item['permissions'] + _groups[rg_id]['permissions']))
                             result['resources'][item['id']] = item
-        current_app.logger.info('End: {0}'.format(time.time() - s))
+        # current_app.logger.info('End: {0}'.format(time.time() - s))
 
         result['resources'] = list(result['resources'].values())
         result['groups'] = list(result['groups'].values())
