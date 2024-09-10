@@ -59,7 +59,7 @@ class AccessTokenCache(object):
 
 class ACLManager(object):
     def __init__(self, app=None):
-        self.app = AppCache.get(app or 'cmdb')
+        self.app = AppCache.get(app or 'acl')
         if not self.app:
             raise Exception(ErrFormat.app_not_found.format(app))
         self.app_id = self.app.id
@@ -248,7 +248,7 @@ def has_perm(resources, resource_type, perm, app=None):
 
 
 def is_app_admin(app=None):
-    app = app or 'cmdb'
+    app = app or 'acl'
     app = AppCache.get(app)
     if app is None:
         return False
