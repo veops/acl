@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2024-01-25 17:19+0800\n"
+"POT-Creation-Date: 2025-08-16 23:41+0800\n"
 "PO-Revision-Date: 2024-01-25 17:19+0800\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: zh\n"
@@ -16,7 +16,81 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.14.0\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: api/lib/resp_format.py:7
+msgid "unauthorized"
+msgstr "未认证"
+
+#: api/lib/resp_format.py:8
+msgid "unknown error"
+msgstr "未知错误"
+
+#: api/lib/resp_format.py:10
+msgid "Illegal request"
+msgstr "不合法的请求"
+
+#: api/lib/resp_format.py:11
+msgid "Invalid operation"
+msgstr "无效的操作"
+
+#: api/lib/resp_format.py:13
+msgid "does not exist"
+msgstr "不存在"
+
+#: api/lib/resp_format.py:15
+msgid "There is a circular dependency!"
+msgstr "存在循环依赖!"
+
+#: api/lib/resp_format.py:17
+msgid "Unknown search error"
+msgstr "未知搜索错误"
+
+#: api/lib/resp_format.py:20
+msgid "The json format seems to be incorrect, please confirm carefully!"
+msgstr "# json格式似乎不正确了, 请仔细确认一下!"
+
+#: api/lib/resp_format.py:23
+msgid ""
+"The format of parameter {} is incorrect, the format must be: yyyy-mm-dd "
+"HH:MM:SS"
+msgstr "参数 {} 格式不正确, 格式必须是: yyyy-mm-dd HH:MM:SS"
+
+#: api/lib/resp_format.py:25
+msgid "The value of parameter {} cannot be empty!"
+msgstr "参数 {} 的值不能为空!"
+
+#: api/lib/resp_format.py:26
+msgid "The request is missing parameters {}"
+msgstr "请求缺少参数 {}"
+
+#: api/lib/resp_format.py:27
+msgid "Invalid value for parameter {}"
+msgstr "参数 {} 的值无效"
+
+#: api/lib/resp_format.py:28
+msgid "The length of parameter {} must be <= {}"
+msgstr "参数 {} 的长度必须 <= {}"
+
+#: api/lib/resp_format.py:30
+msgid "Role {} can only operate!"
+msgstr "角色 {} 才能操作!"
+
+#: api/lib/resp_format.py:31
+msgid "User {} does not exist"
+msgstr "用户 {} 不存在"
+
+#: api/lib/resp_format.py:32
+msgid "For resource: {}, you do not have {} permission!"
+msgstr "您没有资源: {} 的{}权限!"
+
+#: api/lib/resp_format.py:33
+msgid "You do not have permission to operate!"
+msgstr "您没有操作权限!"
+
+#: api/lib/resp_format.py:34
+msgid "Only the creator or administrator has permission!"
+msgstr "只有创建人或者管理员才有权限!"
 
 #: api/lib/common_setting/resp_format.py:8
 msgid "Company info already existed"
@@ -39,6 +113,7 @@ msgid "File type not allowed"
 msgstr "文件类型不允许!"
 
 #: api/lib/common_setting/resp_format.py:14
+#, python-brace-format
 msgid "Upload failed: {}"
 msgstr "上传失败: {}"
 
@@ -67,22 +142,25 @@ msgid "Employee acl rid is zero"
 msgstr "员工ACL角色ID不能为0"
 
 #: api/lib/common_setting/resp_format.py:24
+#, python-brace-format
 msgid "Generate excel failed: {}"
 msgstr "生成excel失败: {}"
 
 #: api/lib/common_setting/resp_format.py:25
+#, python-brace-format
 msgid "Rename columns failed: {}"
 msgstr "重命名字段失败: {}"
 
-#: api/lib/common_setting/resp_format.py:26
+#: api/lib/common_setting/resp_format.py:27
 msgid "Cannot block this employee is other direct supervisor"
 msgstr "该员工是其他员工的直属上级, 不能禁用"
 
-#: api/lib/common_setting/resp_format.py:28
+#: api/lib/common_setting/resp_format.py:29
 msgid "Cannot block this employee is department manager"
 msgstr "该员工是部门负责人, 不能禁用"
 
 #: api/lib/common_setting/resp_format.py:30
+#, python-brace-format
 msgid "Employee id [{}] not found"
 msgstr "员工ID [{}] 不存在!"
 
@@ -95,14 +173,17 @@ msgid "Email already exists"
 msgstr "邮箱已存在!"
 
 #: api/lib/common_setting/resp_format.py:33
+#, python-brace-format
 msgid "Query {} none keep value empty"
 msgstr "查询 {} 空值时请保持value为空"
 
 #: api/lib/common_setting/resp_format.py:34
+#, python-brace-format
 msgid "Not support operator: {}"
 msgstr "不支持的操作符: {}"
 
 #: api/lib/common_setting/resp_format.py:35
+#, python-brace-format
 msgid "Not support relation: {}"
 msgstr "不支持的关系: {}"
 
@@ -111,6 +192,7 @@ msgid "Conditions field missing"
 msgstr " conditions内元素字段缺失，请检查！"
 
 #: api/lib/common_setting/resp_format.py:37
+#, python-brace-format
 msgid "Datetime format error: {}"
 msgstr "{}格式错误，应该为：%Y-%m-%d %H:%M:%S"
 
@@ -131,10 +213,12 @@ msgid "Department list is required"
 msgstr "部门列表是必须的"
 
 #: api/lib/common_setting/resp_format.py:42
+#, python-brace-format
 msgid "{} Cannot to be parent department"
 msgstr "{} 不能设置为上级部门"
 
 #: api/lib/common_setting/resp_format.py:43
+#, python-brace-format
 msgid "Department id [{}] not found"
 msgstr "部门ID [{}] 不存在"
 
@@ -143,6 +227,7 @@ msgid "Parent department id must more than zero"
 msgstr "上级部门ID必须大于0"
 
 #: api/lib/common_setting/resp_format.py:45
+#, python-brace-format
 msgid "Department name [{}] already exists"
 msgstr "部门名称 [{}] 已存在"
 
@@ -151,38 +236,47 @@ msgid "New department is none"
 msgstr "新部门是空的"
 
 #: api/lib/common_setting/resp_format.py:48
+#, python-brace-format
 msgid "ACL edit user failed: {}"
 msgstr "ACL 修改用户失败: {}"
 
 #: api/lib/common_setting/resp_format.py:49
+#, python-brace-format
 msgid "ACL uid not found: {}"
 msgstr "ACL 用户UID [{}] 不存在"
 
 #: api/lib/common_setting/resp_format.py:50
+#, python-brace-format
 msgid "ACL add user failed: {}"
 msgstr "ACL 添加用户失败: {}"
 
 #: api/lib/common_setting/resp_format.py:51
+#, python-brace-format
 msgid "ACL add role failed: {}"
 msgstr "ACL 添加角色失败: {}"
 
 #: api/lib/common_setting/resp_format.py:52
+#, python-brace-format
 msgid "ACL update role failed: {}"
 msgstr "ACL 更新角色失败: {}"
 
 #: api/lib/common_setting/resp_format.py:53
+#, python-brace-format
 msgid "ACL get all users failed: {}"
 msgstr "ACL 获取所有用户失败: {}"
 
 #: api/lib/common_setting/resp_format.py:54
+#, python-brace-format
 msgid "ACL remove user from role failed: {}"
 msgstr "ACL 从角色中移除用户失败: {}"
 
 #: api/lib/common_setting/resp_format.py:55
+#, python-brace-format
 msgid "ACL add user to role failed: {}"
 msgstr "ACL 添加用户到角色失败: {}"
 
 #: api/lib/common_setting/resp_format.py:56
+#, python-brace-format
 msgid "ACL import user failed: {}"
 msgstr "ACL 导入用户失败: {}"
 
@@ -207,18 +301,22 @@ msgid "Email send timeout"
 msgstr "邮件发送超时"
 
 #: api/lib/common_setting/resp_format.py:64
+#, python-brace-format
 msgid "Common data not found {} "
 msgstr "ID {} 找不到记录"
 
 #: api/lib/common_setting/resp_format.py:65
+#, python-brace-format
 msgid "Common data {} already existed"
 msgstr "{} 已经存在"
 
 #: api/lib/common_setting/resp_format.py:66
+#, python-brace-format
 msgid "Notice platform {} existed"
 msgstr "{} 已经存在"
 
 #: api/lib/common_setting/resp_format.py:67
+#, python-brace-format
 msgid "Notice {} not existed"
 msgstr "{} 配置项不存在"
 
@@ -231,6 +329,7 @@ msgid "Notice bind err with empty mobile"
 msgstr "绑定错误，手机号为空"
 
 #: api/lib/common_setting/resp_format.py:70
+#, python-brace-format
 msgid "Notice bind failed: {}"
 msgstr "绑定失败: {}"
 
@@ -243,10 +342,12 @@ msgid "Notice remove bind success"
 msgstr "解绑成功"
 
 #: api/lib/common_setting/resp_format.py:74
+#, python-brace-format
 msgid "Not support test type: {}"
 msgstr "不支持的测试类型: {}"
 
 #: api/lib/common_setting/resp_format.py:75
+#, python-brace-format
 msgid "Not support auth type: {}"
 msgstr "不支持的认证类型: {}"
 
@@ -259,10 +360,12 @@ msgid "LDAP server connect not available"
 msgstr "LDAP服务器连接不可用"
 
 #: api/lib/common_setting/resp_format.py:78
+#, python-brace-format
 msgid "LDAP test unknown error: {}"
 msgstr "LDAP测试未知错误: {}"
 
 #: api/lib/common_setting/resp_format.py:79
+#, python-brace-format
 msgid "Common data not support auth type: {}"
 msgstr "通用数据不支持auth类型: {}"
 
@@ -273,6 +376,10 @@ msgstr "LDAP测试用户名必填"
 #: api/lib/common_setting/resp_format.py:82
 msgid "Company wide"
 msgstr "全公司"
+
+#: api/lib/common_setting/resp_format.py:84
+msgid "No permission to access resource {}, perm {} "
+msgstr "您没有资源: {} 的 {} 权限"
 
 #: api/lib/perm/acl/resp_format.py:9
 msgid "login successful"
@@ -290,17 +397,19 @@ msgstr "密码验证失败"
 msgid "Application Token verification failed"
 msgstr "应用 Token验证失败"
 
-#: api/lib/perm/acl/resp_format.py:14
+#: api/lib/perm/acl/resp_format.py:15
 msgid ""
 "You are not the application administrator or the session has expired (try"
 " logging out and logging in again)"
 msgstr "您不是应用管理员 或者 session失效(尝试一下退出重新登录)"
 
 #: api/lib/perm/acl/resp_format.py:17
+#, python-brace-format
 msgid "Resource type {} does not exist!"
 msgstr "资源类型 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:18
+#, python-brace-format
 msgid "Resource type {} already exists!"
 msgstr "资源类型 {} 已经存在!"
 
@@ -309,30 +418,37 @@ msgid "Because there are resources under this type, they cannot be deleted!"
 msgstr "因为该类型下有资源的存在, 不能删除!"
 
 #: api/lib/perm/acl/resp_format.py:22
+#, python-brace-format
 msgid "User {} does not exist!"
 msgstr "用户 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:23
+#, python-brace-format
 msgid "User {} already exists!"
 msgstr "用户 {} 已经存在!"
 
 #: api/lib/perm/acl/resp_format.py:24
+#, python-brace-format
 msgid "Role {} does not exist!"
 msgstr "角色 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:25
+#, python-brace-format
 msgid "Role {} already exists!"
 msgstr "角色 {} 已经存在!"
 
 #: api/lib/perm/acl/resp_format.py:26
+#, python-brace-format
 msgid "Global role {} does not exist!"
 msgstr "全局角色 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:27
+#, python-brace-format
 msgid "Global role {} already exists!"
 msgstr "全局角色 {} 已经存在!"
 
 #: api/lib/perm/acl/resp_format.py:29
+#, python-brace-format
 msgid "You do not have {} permission on resource: {}"
 msgstr "您没有资源: {} 的 {} 权限"
 
@@ -341,6 +457,7 @@ msgid "Requires administrator permissions"
 msgstr "需要管理员权限"
 
 #: api/lib/perm/acl/resp_format.py:31
+#, python-brace-format
 msgid "Requires role: {}"
 msgstr "需要角色: {}"
 
@@ -349,10 +466,12 @@ msgid "To delete a user role, please operate on the User Management page!"
 msgstr "删除用户角色, 请在 用户管理 页面操作!"
 
 #: api/lib/perm/acl/resp_format.py:35
+#, python-brace-format
 msgid "Application {} already exists"
 msgstr "应用 {} 已经存在"
 
 #: api/lib/perm/acl/resp_format.py:36
+#, python-brace-format
 msgid "Application {} does not exist!"
 msgstr "应用 {} 不存在!"
 
@@ -361,18 +480,22 @@ msgid "The Secret is invalid"
 msgstr "应用的Secret无效"
 
 #: api/lib/perm/acl/resp_format.py:39
+#, python-brace-format
 msgid "Resource {} does not exist!"
 msgstr "资源 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:40
+#, python-brace-format
 msgid "Resource {} already exists!"
 msgstr "资源 {} 已经存在!"
 
 #: api/lib/perm/acl/resp_format.py:42
+#, python-brace-format
 msgid "Resource group {} does not exist!"
 msgstr "资源组 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:43
+#, python-brace-format
 msgid "Resource group {} already exists!"
 msgstr "资源组 {} 已经存在!"
 
@@ -381,17 +504,22 @@ msgid "Inheritance detected infinite loop"
 msgstr "继承检测到了死循环"
 
 #: api/lib/perm/acl/resp_format.py:46
+#, python-brace-format
 msgid "Role relationship {} does not exist!"
 msgstr "角色关系 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:48
+#, python-brace-format
 msgid "Trigger {} does not exist!"
 msgstr "触发器 {} 不存在!"
 
 #: api/lib/perm/acl/resp_format.py:49
+#, python-brace-format
 msgid "Trigger {} already exists!"
 msgstr "触发器 {} 已经存在!"
 
 #: api/lib/perm/acl/resp_format.py:50
+#, python-brace-format
 msgid "Trigger {} has been disabled!"
 msgstr "Trigger {} has been disabled!"
+
